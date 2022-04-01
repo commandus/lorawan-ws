@@ -15,7 +15,7 @@
 #include <microhttpd.h>
 #include <sqlite3.h>
 
-typedef struct wsConfig
+typedef struct 
 {
 	// sqlite3
 	const char *dbfilename;
@@ -29,7 +29,7 @@ typedef struct wsConfig
 	int verbosity;
 	// web server descriptor
 	void *descriptor;
-};
+} WSConfig;
 
 void setLogFile(std::ostream* value);
 
@@ -42,13 +42,13 @@ bool startWS(
 	unsigned int threadCount,
 	unsigned int connectionLimit,
 	unsigned int flags,
-	wsConfig &config
+	WSConfig &config
 );
 
 void* doneWS(
-	wsConfig &config
+	WSConfig &config
 );
 
-bool checkDbConnection(wsConfig *config);
+bool checkDbConnection(WSConfig *config);
 
 #endif
