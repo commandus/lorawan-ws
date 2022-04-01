@@ -15,8 +15,6 @@
 
 #include "platform.h"
 
-#include "sqlite/sqlite3.h"
-
 #include <sys/stat.h>
 
 #ifndef _MSC_VER
@@ -28,13 +26,13 @@
 
 #include "lorawan-ws.h"
 
-// static struct wsConfig config;
+// static struct WSConfig config;
 
 std::ostream *logstream = NULL;
 
 void setLogFile(std::ostream* value)
 {
-	if ((value == NULL) && (logstream)) 
+	if ((value == NULL) && (logstream))
 		delete logstream;
 	logstream = value;
 }
@@ -42,7 +40,7 @@ void setLogFile(std::ostream* value)
 /**
  * Establish configured database connection
  */
-static sqlite3 *dbconnect(wsConfig *config)
+static sqlite3 *dbconnect(WSConfig *config)
 {
 	sqlite3 *r = NULL;
 	if (config && (config->dbfilename) && (strlen(config->dbfilename)))
@@ -54,7 +52,7 @@ static sqlite3 *dbconnect(wsConfig *config)
 	return r;
 }
 
-bool checkDbConnection(wsConfig *config)
+bool checkDbConnection(WSConfig *config)
 {
 	sqlite3 *r = dbconnect(config);
 	if (r) {
@@ -118,30 +116,27 @@ const static char *CT_BIN = "application/octet";
 
 const static char *FMT_URL_JSON_HISTORY = "http://iridium.ysn.ru/m.php?get=history&u=%s&p=%s&fmt=2&start=%lld";
 
-typedef struct RequestParams
+typedef struct 
 {
-	RequestType requesttype;
-	const char *params[QUERY_PARAMS_SIZE];
-};
+	RequestType requestType;
+} RequestParams;
 
-typedef struct OutputState
-{
+typedef struct{
 	int state;
-	int buffersize;
-	void *buffer;
-};
+} OutputState;
 
 #ifdef _MSC_VER
 #pragma warning(disable: 4996)
 #endif
 
-typedef RequestEnv
+typedef struct 
 {
+	RequestParams request;
 	sqlite3 *db;		// each request in separate connection
 	sqlite3_stmt *stmt;	// SQL statement
-	struct wsConfig *config;
+	WSConfig *config;
 	OutputState state;
-};
+} RequestEnv;
 
 static RequestType parseRequestType(const char *url)
 {
@@ -227,10 +222,10 @@ static const char *mimeTypeByFileExtention(const std::string &filename)
 
 }
 
-static int processFile(struct MHD_Connection *connection, const std::string &filename)
+static MHD_Result processFile(struct MHD_Connection *connection, const std::string &filename)
 {
 	struct MHD_Response *response;
-	int ret;
+	MHD_Result ret;
 	FILE *file;
 	struct stat buf;
 
@@ -327,11 +322,11 @@ static int startFetchDb
 		return 1;
 
 	int r = sqlite3_prepare_v2(env->db,
-		pathSelect[env->request.requesttype], -1, &env->stmt, NULL);
+		pathSelect[env->request.requestType], -1, &env->stmt, NULL);
 	if (r)
 		return 2;
 	for (int i = 0; i < QUERY_PARAMS_MAX; i++)	{
-		int v = pathParams[env->request.requesttype][i];
+		int v = pathParams[env->request.requestType][i];
 		if (!v)
 			break; // no more parameters
 		const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);
@@ -422,20 +417,20 @@ static void chunk_done_callback(void *cls)
 	}
 }
 
-static int request_callback
-(
-	void *cls,			// struct wsConfig*
+static MHD_Result request_callback(
+	void *cls,			// struct WSConfig*
 	struct MHD_Connection *connection,
 	const char *url,
 	const char *method,
 	const char *version,
 	const char *upload_data,
 	size_t *upload_data_size,
-	void **ptr)
+	void **ptr
+)
 {
 	static int aptr;
 	struct MHD_Response *response;
-	int ret;
+	MHD_Result ret;
 
 	if (&aptr != *ptr) {
 		// do never respond on first call
@@ -449,12 +444,12 @@ static int request_callback
 
 	RequestEnv *requestenv = (RequestEnv *) malloc(sizeof(RequestEnv));
 	requestenv->state.state = 0;
-	requestenv->config = (wsConfig*) cls;
+	requestenv->config = (WSConfig*) cls;
 
-	requestenv->requesttype = parseRequestType(url);
+	requestenv->request.requestType = parseRequestType(url);
 
 	char *buf;
-	if (requestenv->request.requesttype == RT_UNKNOWN) {
+	if (requestenv->request.requestType == RT_UNKNOWN) {
 			std::string fn = buildFileName(requestenv->config->dirRoot, url);
 			return processFile(connection, fn);
 	}
@@ -476,21 +471,23 @@ bool startWS(
 	unsigned int threadCount,
 	unsigned int connectionLimit,
 	unsigned int flags,
-	wsConfig &config
+	WSConfig &config
 ) {
-	(struct MHD_Daemon *) config.descriptor = MHD_start_daemon(
-		flags, config.port, NULL, NULL, &request_callback, &config,
+	struct MHD_Daemon *d = MHD_start_daemon(
+		flags, config.port, NULL, NULL, 
+		&request_callback, &config,
 		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
                 MHD_OPTION_THREAD_POOL_SIZE, threadCount,
                 MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, NULL,
                 MHD_OPTION_CONNECTION_LIMIT, connectionLimit,
                 MHD_OPTION_END
 	);
+	config.descriptor = (void *) d;
 	return config.descriptor != NULL;
 }
 
 void* doneWS(
-	wsConfig &config
+	WSConfig &config
 ) {
 	if (config.descriptor)
 		MHD_stop_daemon((struct MHD_Daemon *) config.descriptor);

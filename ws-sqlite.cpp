@@ -33,7 +33,7 @@ const char *progname = "ws-sqlite";
 
 #define DEF_DB_FN "../lorawan-network-server/db/logger-huffman.db"
 
-wsConfig config;
+WSConfig config;
 
 std::string getPathFirstFragments(const std::string &value)
 {
@@ -52,14 +52,14 @@ std::string getPathFirstFragments(const std::string &value)
  **/
 int parseCmd
 (
-	struct wsConfig *retval,
+	WSConfig *retval,
 	int argc,
 	char* argv[]
 )
 {
 	struct arg_int *a_listenport = arg_int0("l", "listen", "<port>", "port number. Default 5002");
 	struct arg_str *a_dirroot = arg_str0("r", "root", "<path>", "web root path. Default './html'");
-	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default "DEF_DB_FN);
+	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
 	struct arg_lit *a_verbosity = arg_litn("v", "verbosity", 0, 4, "v- error, vv- warning, vvv, vvvv- debug");
 	struct arg_file *a_logfile = arg_file0("l", "log", "<file>", "log file");
@@ -155,7 +155,7 @@ void setSignalHandler(int signal)
 
 int main(int argc, char* argv[])
 {
-	wsConfig config;
+	WSConfig config;
 	int r = parseCmd(&config, argc, argv);
 	if (r)
 		exit(r);
