@@ -48,34 +48,39 @@ void setLogFile(std::ostream* value)
  */
 static sqlite3 *dbconnect(WSConfig *config)
 {
-	sqlite3 *r = NULL;
+	config->db = NULL;
 	if (config && (config->dbfilename) && (strlen(config->dbfilename)))
 	{
-		config->lasterr = sqlite3_open(config->dbfilename, &r);
+		config->lasterr = sqlite3_open_v2(config->dbfilename, (sqlite3 **) &config->db, SQLITE_OPEN_READWRITE, NULL);	// SQLITE_OPEN_READWRITE
 		if (config->lasterr != SQLITE_OK)
-			r = NULL;
+			config->db = NULL;
 	}
-	return r;
+	return (sqlite3 *) config->db;
 }
 
 const char *CREATE_STATEMENTS[2] = {
-	"CREATE TABLE \"logger_raw\"(\"id\" INTEGER PRIMARY KEY, \"raw\" text, devname text, loraaddr text, received text)",
-	"CREATE TABLE \"logger_lora\"(\"id\" INTEGER PRIMARY KEY, \"kosa\" integer, \"year\" integer, \"no\" integer, \"measured\" integer, \"parsed\" integer, \"vcc\" float, \"vbat\" float, \"t\" text, \"raw\" text);"
+	"CREATE TABLE \"logger_raw\"(\"id\" INTEGER PRIMARY KEY, \"raw\" text, devname text, loraaddr text, received text);",
+	"CREATE TABLE \"logger_lora\"(\"id\" INTEGER PRIMARY KEY, \"kosa\" integer, \"year\" integer, \"no\" integer, "
+		"\"measured\" integer, \"parsed\" integer, \"vcc\" float, \"vbat\" float, \"t\" text, \"raw\" text, "
+		"devname text, loraaddr text, received text);"
 };
 
 bool createTables(WSConfig &config)
 {
-	sqlite3 *db = dbconnect(&config);
+	sqlite3 *db;
+	config.lasterr = sqlite3_open_v2(config.dbfilename, &db, SQLITE_OPEN_READWRITE  | SQLITE_OPEN_CREATE, NULL);
 	if (!db)
 		return false;
-	sqlite3_stmt *stmt;
 	for (int i = 0; i < 2; i++) {
-		int r = sqlite3_prepare_v2(db,	CREATE_STATEMENTS[i], -1, &stmt, NULL);
-		r = sqlite3_step(stmt);
-		r = sqlite3_finalize(stmt);
+		char *errmsg = NULL;
+		config.lasterr = sqlite3_exec(db, CREATE_STATEMENTS[i], NULL, NULL, &errmsg);
+		if (config.lasterr) {
+			sqlite3_free(errmsg);
+			return false;
+		}
 	}
-
-	sqlite3_close(db);	
+	sqlite3_close(db);
+	return config.lasterr == SQLITE_OK;	
 }
 
 bool checkDbConnection(WSConfig *config)
@@ -106,12 +111,10 @@ const char *paths[PATH_COUNT] = {
 
 const char *pathSelect[PATH_COUNT] = {
 	"SELECT id, raw, devname, loraaddr, received FROM logger_raw "
-	"ORDER BY id LIMIT ?1, ?2",
+	"ORDER BY id LIMIT ?1, ?2;",
 	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora "
-	"ORDER BY id LIMIT ?1, ?2"
+	"ORDER BY id LIMIT ?1, ?2;"
 };
-
-		
 
 #define QUERY_PARAMS_SIZE 15
 #define QUERY_PARAMS_MAX 5
@@ -122,9 +125,11 @@ static const char* queryParamNames[QUERY_PARAMS_SIZE] = {
 	"vcc",		"vbat",		"devname",	"loraaddr",	"received"
 };
 
+#define EOP -1
+
 const int pathParams[PATH_COUNT][QUERY_PARAMS_MAX] = {
-	{ 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0 }
+	{ 0, 1, EOP, 0, 0 },
+	{ 0, 1, EOP, 0, 0 }
 };
 
 const static char *MSG404 = "404 not found";
@@ -154,7 +159,6 @@ const static char *MSG500[5] = {
 	"Required parameter missed",
 	"Binding parameter failed"
 };
-
 
 typedef struct 
 {
@@ -206,8 +210,7 @@ void *uri_logger_callback (void *cls, const char *uri)
 	return NULL;
 }
 
-static int doneFetch
-(
+static int doneFetch(
 	RequestEnv *env
 )
 {
@@ -215,10 +218,6 @@ static int doneFetch
 		return 0;
 	sqlite3_finalize(env->stmt);
 	env->stmt = NULL;
-	if (!env->db)
-		return 0;
-	sqlite3_close(env->db);
-	env->db = NULL;
 	return 0;
 }
 
@@ -315,41 +314,49 @@ static std::string buildFileName(const char *dirRoot, const char *url)
 	return r.str();
 }
 
-static START_FETCH_DB_RESULT startFetchDb
-(
+static START_FETCH_DB_RESULT startFetchDb(
 	struct MHD_Connection *connection,
 	RequestEnv *env
 )
 {
-	env->db = dbconnect(env->config);
-	if (env->db == NULL)
-		return START_FETCH_DB_CONNECT_FAILED;
-
 	int r = sqlite3_prepare_v2(env->db,
 		pathSelect[env->request.requestType], -1, &env->stmt, NULL);
 	if (r) {
 		if (logstream)
-			*logstream << "Error " << r << " db " << env->config->dbfilename 
+			*logstream << "Error " << r 
+				<< ": " << sqlite3_errmsg(env->db)
+				<< " db " << env->config->dbfilename 
 				<< " SQL " << pathSelect[env->request.requestType]
 				<< std::endl;
 		return START_FETCH_DB_PREPARE_FAILED;
 	}
 	for (int i = 0; i < QUERY_PARAMS_MAX; i++)	{
 		int v = pathParams[env->request.requestType][i];
-		if (!v)
+		if (v == EOP)
 			break; // no more parameters
 		const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);
-		if (!c)
-			r = START_FETCH_DB_NO_PARAM;
-		else	
+		if (!c) {
+			if (logstream)
+				*logstream << "Binding parameter " 
+						<< "#" << i + 1
+						<< " " << queryParamNames[v]
+						<< " empty" << std::endl;
+			sqlite3_finalize(env->stmt);
+			return START_FETCH_DB_NO_PARAM;
+		} else {	
 			r = sqlite3_bind_text(env->stmt, i + 1, c, -1, SQLITE_STATIC);
-		if (r)
-			break;
-	}
-	if (r) {
-		sqlite3_close(env->db);
-		env->db = NULL;
-		return START_FETCH_DB_BIND_PARAM;
+			// r = sqlite3_bind_int(env->stmt, i + 1, 1);
+			if (r) {
+				if (logstream)
+					*logstream << "Bind parameter error " 
+						<< r << ": " << sqlite3_errstr(r)
+						<< ", parameter #" << i + 1
+						<< " " << queryParamNames[v]
+						<< " = " << c << std::endl;
+				sqlite3_finalize(env->stmt);
+				return START_FETCH_DB_BIND_PARAM;
+			}
+		}
 	}
 	return START_FETCH_DB_OK;
 }
@@ -361,36 +368,47 @@ static size_t result2json(
 )
 {
 	std::stringstream ss;
-	int columns = sqlite3_column_count(env->stmt);
-
 	int st = env->state.state;
 	size_t sz;
 
 	switch (st)
 	{
 		case 0:
+			env->state.state = 1;
 			ss << "[{";
 			break;
 		case 1:
-			ss << ", {";
+			ss << "}, {";
 			break;
+		case 2:
+			sz = snprintf(buf, bufSize, "}]");
+			return sz;
+		case 3:
+			sz = snprintf(buf, bufSize, "[]");
+			return sz;
 		default:
 			sz = snprintf(buf, bufSize, "]");
 			return sz;
 	}
+	int columns = sqlite3_column_count(env->stmt);
 	
 	bool isFirst = true;
 	for (int c = 0; c < columns; c++) {
 		const char *n = sqlite3_column_name(env->stmt, c);
 		const unsigned char *v = sqlite3_column_text(env->stmt, c);
+		int t = sqlite3_column_type(env->stmt, c);
+		if (v == NULL)
+			 continue;
 		if (isFirst)
 			isFirst = false;
 		else
 			ss << ", ";
-		ss << "\"" << n << "\": " 
-			<< "\"" << v << "\"";
+		ss << "\"" << n << "\": ";
+		if (t == SQLITE_TEXT) 
+			ss << "\"" << v << "\"";
+		else
+			ss << v;
 	}
-	ss << "}";
 	std::string s = ss.str();
 	sz = s.size();
 	memmove(buf, s.c_str(), sz > bufSize ? bufSize : sz);
@@ -400,15 +418,11 @@ static size_t result2json(
 static ssize_t chunk_callbackFetchDb(void *cls, uint64_t pos, char *buf, size_t max)
 {
 	RequestEnv *env = (RequestEnv*) cls;
-
 	if (env->state.state >= 2)
 		return MHD_CONTENT_READER_END_OF_STREAM;
 
-
 	int r = sqlite3_step(env->stmt);
-
-	if (r != SQLITE_ROW)
-	{
+	if (r != SQLITE_ROW) {
 		env->state.state = env->state.state == 0 ? 3 : 2;
 		return result2json(buf, max, env);
 	}
@@ -454,7 +468,7 @@ static MHD_Result request_callback(
 	RequestEnv *requestenv = (RequestEnv *) malloc(sizeof(RequestEnv));
 	requestenv->state.state = 0;
 	requestenv->config = (WSConfig*) cls;
-
+	requestenv->db = (sqlite3 *) requestenv->config->db;
 	requestenv->request.requestType = parseRequestType(url);
 
 	char *buf;
@@ -479,13 +493,16 @@ static MHD_Result request_callback(
 	return ret;
 }
 
-
 bool startWS(
 	unsigned int threadCount,
 	unsigned int connectionLimit,
 	unsigned int flags,
 	WSConfig &config
 ) {
+	dbconnect(&config);
+	if (!config.db)
+		return START_FETCH_DB_CONNECT_FAILED;
+
 	struct MHD_Daemon *d = MHD_start_daemon(
 		flags, config.port, NULL, NULL, 
 		&request_callback, &config,
@@ -506,4 +523,6 @@ void doneWS(
 		MHD_stop_daemon((struct MHD_Daemon *) config.descriptor);
 	config.descriptor = NULL;
 	setLogFile(NULL);
+	sqlite3_close((sqlite3 *) config.db);
+	config.db = NULL;
 }

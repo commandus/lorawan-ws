@@ -22,6 +22,8 @@ typedef struct
 	int verbosity;
 	// web server descriptor
 	void *descriptor;
+	// sqlite3 descriptor
+	void *db;
 } WSConfig;
 
 void setLogFile(std::ostream* value);

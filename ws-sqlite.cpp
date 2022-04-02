@@ -65,7 +65,7 @@ int parseCmd
 	struct arg_str *a_dirroot = arg_str0("r", "root", "<path>", "web root path. Default './html'");
 	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
-	struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force cretae table in database");
+	struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force create table in database");
 	struct arg_lit *a_verbosity = arg_litn("v", "verbosity", 0, 4, "v- error, vv- warning, vvv, vvvv- debug");
 	struct arg_file *a_logfile = arg_file0("l", "log", "<file>", "log file");
 	
@@ -127,11 +127,13 @@ int parseCmd
 	if ((!retval->dbfilename) || (strlen(retval->dbfilename) == 0))
 		retval->dbfilename = DEF_DB_FN;
 
+	if (!createTable) {
 	// check database connection
 	if (!checkDbConnection(retval))
-	{
-		fprintf(stderr, "Invalid database file %s\n", retval->dbfilename);
-		return 2;
+		{
+			fprintf(stderr, "Invalid database file %s\n", retval->dbfilename);
+			return 2;
+		}
 	}
 
 	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
@@ -168,6 +170,8 @@ int main(int argc, char* argv[])
 	int r = parseCmd(&config, createTable, argc, argv);
 	if (createTable) {
 		createTables(config);
+		if (config.lasterr)
+			std::cerr << "Error create tables " << config.lasterr << std::endl;
 		exit(0);
 	}
 	if (r)
