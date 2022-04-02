@@ -24,6 +24,12 @@
 #include <netinet/in.h>
 #endif
 
+#include <sqlite3.h>
+#include <microhttpd.h>
+#if MHD_VERSION <= 0x00096600
+#define MHD_Result int
+#endif
+
 #include "lorawan-ws.h"
 
 // static struct WSConfig config;
@@ -52,6 +58,26 @@ static sqlite3 *dbconnect(WSConfig *config)
 	return r;
 }
 
+const char *CREATE_STATEMENTS[2] = {
+	"CREATE TABLE \"logger_raw\"(\"id\" INTEGER PRIMARY KEY, \"raw\" text, devname text, loraaddr text, received text)",
+	"CREATE TABLE \"logger_lora\"(\"id\" INTEGER PRIMARY KEY, \"kosa\" integer, \"year\" integer, \"no\" integer, \"measured\" integer, \"parsed\" integer, \"vcc\" float, \"vbat\" float, \"t\" text, \"raw\" text);"
+};
+
+bool createTables(WSConfig &config)
+{
+	sqlite3 *db = dbconnect(&config);
+	if (!db)
+		return false;
+	sqlite3_stmt *stmt;
+	for (int i = 0; i < 2; i++) {
+		int r = sqlite3_prepare_v2(db,	CREATE_STATEMENTS[i], -1, &stmt, NULL);
+		r = sqlite3_step(stmt);
+		r = sqlite3_finalize(stmt);
+	}
+
+	sqlite3_close(db);	
+}
+
 bool checkDbConnection(WSConfig *config)
 {
 	sqlite3 *r = dbconnect(config);
@@ -68,7 +94,7 @@ typedef enum
 {
 	RT_RAW = 0,			//< List of coordinates
 	RT_T = 1,			//< List of device and their states
-	RT_UNKNOWN = 100		//< file request
+	RT_UNKNOWN = 100	//< file request
 
 } RequestType;
 
@@ -81,7 +107,7 @@ const char *paths[PATH_COUNT] = {
 const char *pathSelect[PATH_COUNT] = {
 	"SELECT id, raw, devname, loraaddr, received FROM logger_raw "
 	"ORDER BY id LIMIT ?1, ?2",
-	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM raw "
+	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora "
 	"ORDER BY id LIMIT ?1, ?2"
 };
 
@@ -102,7 +128,6 @@ const int pathParams[PATH_COUNT][QUERY_PARAMS_MAX] = {
 };
 
 const static char *MSG404 = "404 not found";
-const static char *MSG500 = "500 Internal error";
 const static char *dateformat = "%FT%T";
 const static char *dateformatview = "%F %T";
 const static char *CT_HTML = "text/html;charset=UTF-8";
@@ -114,7 +139,22 @@ const static char *CT_TEXT = "text/plain;charset=UTF-8";
 const static char *CT_TTF = "font/ttf";
 const static char *CT_BIN = "application/octet";
 
-const static char *FMT_URL_JSON_HISTORY = "http://iridium.ysn.ru/m.php?get=history&u=%s&p=%s&fmt=2&start=%lld";
+typedef enum {
+	START_FETCH_DB_OK = 0,
+	START_FETCH_DB_CONNECT_FAILED = 1,
+	START_FETCH_DB_PREPARE_FAILED = 2,
+	START_FETCH_DB_NO_PARAM = 3,
+	START_FETCH_DB_BIND_PARAM = 4
+} START_FETCH_DB_RESULT;
+
+const static char *MSG500[5] = {
+	"200 OK",
+	"Database connection not established",
+	"SQL statement preparation failed",
+	"Required parameter missed",
+	"Binding parameter failed"
+};
+
 
 typedef struct 
 {
@@ -275,43 +315,7 @@ static std::string buildFileName(const char *dirRoot, const char *url)
 	return r.str();
 }
 
-static int processDb(struct MHD_Connection *connection, const std::string &filename)
-{
-	struct MHD_Response *response;
-	int ret;
-	FILE *file;
-	struct stat buf;
-
-	const char *fn = filename.c_str();
-
-	if (stat(fn, &buf) == 0)
-		file = fopen(fn, "rb");
-	else
-		file = NULL;
-	if (file == NULL) {
-		if (logstream)
-			*logstream << "E404: " << fn << std::endl;
-
-		response = MHD_create_response_from_buffer(strlen(MSG404), (void *) MSG404, MHD_RESPMEM_PERSISTENT);
-		ret = MHD_queue_response (connection, MHD_HTTP_NOT_FOUND, response);
-		MHD_destroy_response (response);
-	} else {
-		response = MHD_create_response_from_callback(buf.st_size, 32 * 1024,
-			&file_reader_callback, file, &free_file_reader_callback);
-		if (NULL == response)
-		{
-			fclose (file);
-			return MHD_NO;
-		}
-
-		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, mimeTypeByFileExtention(filename));
-		ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-		MHD_destroy_response(response);
-	}
-	return ret;
-}
-
-static int startFetchDb
+static START_FETCH_DB_RESULT startFetchDb
 (
 	struct MHD_Connection *connection,
 	RequestEnv *env
@@ -319,19 +323,24 @@ static int startFetchDb
 {
 	env->db = dbconnect(env->config);
 	if (env->db == NULL)
-		return 1;
+		return START_FETCH_DB_CONNECT_FAILED;
 
 	int r = sqlite3_prepare_v2(env->db,
 		pathSelect[env->request.requestType], -1, &env->stmt, NULL);
-	if (r)
-		return 2;
+	if (r) {
+		if (logstream)
+			*logstream << "Error " << r << " db " << env->config->dbfilename 
+				<< " SQL " << pathSelect[env->request.requestType]
+				<< std::endl;
+		return START_FETCH_DB_PREPARE_FAILED;
+	}
 	for (int i = 0; i < QUERY_PARAMS_MAX; i++)	{
 		int v = pathParams[env->request.requestType][i];
 		if (!v)
 			break; // no more parameters
 		const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);
 		if (!c)
-			r = 1;
+			r = START_FETCH_DB_NO_PARAM;
 		else	
 			r = sqlite3_bind_text(env->stmt, i + 1, c, -1, SQLITE_STATIC);
 		if (r)
@@ -340,9 +349,9 @@ static int startFetchDb
 	if (r) {
 		sqlite3_close(env->db);
 		env->db = NULL;
-		return 3;
+		return START_FETCH_DB_BIND_PARAM;
 	}
-	return 0;
+	return START_FETCH_DB_OK;
 }
 
 static size_t result2json(
@@ -454,14 +463,18 @@ static MHD_Result request_callback(
 			return processFile(connection, fn);
 	}
 
-	int r = startFetchDb(connection, requestenv);
+	int r = (int) startFetchDb(connection, requestenv);
 	char *msg;
-	if (r)
-		response = MHD_create_response_from_buffer(strlen(MSG500), (void *) MSG500, MHD_RESPMEM_PERSISTENT);
-	else
+	int hc;
+	if (r) {
+		hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
+	} else {
+		hc = MHD_HTTP_OK;
 		response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv, &chunk_done_callback);
+	}
 	MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
-	ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+	ret = MHD_queue_response(connection, hc, response);
 	MHD_destroy_response(response);
 	return ret;
 }
@@ -486,7 +499,7 @@ bool startWS(
 	return config.descriptor != NULL;
 }
 
-void* doneWS(
+void doneWS(
 	WSConfig &config
 ) {
 	if (config.descriptor)

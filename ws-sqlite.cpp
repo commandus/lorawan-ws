@@ -5,6 +5,9 @@
 #include <string.h>
 #include <signal.h>
 
+#include <microhttpd.h>
+#include <sqlite3.h>
+
 #include "argtable3/argtable3.h"
 
 #include "platform.h"
@@ -13,7 +16,7 @@
 
 const char *progname = "ws-sqlite";
 
-#define MHD_START_FLAGS 		0
+#define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
 
 /**
  * Number of threads to run in the thread pool.  Should (roughly) match
@@ -53,21 +56,24 @@ std::string getPathFirstFragments(const std::string &value)
 int parseCmd
 (
 	WSConfig *retval,
+	bool &createTable,
 	int argc,
 	char* argv[]
 )
 {
-	struct arg_int *a_listenport = arg_int0("l", "listen", "<port>", "port number. Default 5002");
+	struct arg_int *a_listenport = arg_int0("p", "port", "<port>", "port number. Default 5002");
 	struct arg_str *a_dirroot = arg_str0("r", "root", "<path>", "web root path. Default './html'");
 	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
+	struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force cretae table in database");
 	struct arg_lit *a_verbosity = arg_litn("v", "verbosity", 0, 4, "v- error, vv- warning, vvv, vvvv- debug");
 	struct arg_file *a_logfile = arg_file0("l", "log", "<file>", "log file");
 	
 	struct arg_lit *a_help = arg_lit0("h", "help", "Show this help");
 	struct arg_end *a_end = arg_end(20);
 
-	void* argtable[] = { a_listenport, a_dirroot, a_logfile,
+	void* argtable[] = { a_listenport, a_dirroot, a_database, a_logfile,
+		a_create_table,
 		a_verbosity, a_help, a_end
 	};
 
@@ -94,6 +100,8 @@ int parseCmd
 		arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
 		return 1;
 	}
+
+	createTable = a_create_table->count > 0;
 
 	if (a_dirroot->count)
 		retval->dirRoot = *a_dirroot->sval;
@@ -156,15 +164,26 @@ void setSignalHandler(int signal)
 int main(int argc, char* argv[])
 {
 	WSConfig config;
-	int r = parseCmd(&config, argc, argv);
+	bool createTable;
+	int r = parseCmd(&config, createTable, argc, argv);
+	if (createTable) {
+		createTables(config);
+		exit(0);
+	}
 	if (r)
 		exit(r);
 
 	// Signal handler
 	setSignalHandler(SIGINT);
+	if (config.verbosity)
+		std::cerr << "SQLite version " << SQLITE_VERSION << std::endl;
 
-	if (!startWS(NUMBER_OF_THREADS, 1000, MHD_START_FLAGS, config))
+	if (!startWS(NUMBER_OF_THREADS, 1000, MHD_START_FLAGS, config)) {
+		std::cerr << "Can not start web service errno " 
+			<< errno << ": " << strerror(errno) << std::endl;
+			std::cerr << "libmicrohttpd version " << std::hex << MHD_VERSION << std::endl;
 		return 1;
+	}
 
 	while (true)
 	{
