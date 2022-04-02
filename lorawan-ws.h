@@ -8,13 +8,6 @@
 #include <iostream>
 #include <fstream>
 
-#ifndef _MSC_VER
-#include <sys/socket.h>
-#endif
-
-#include <microhttpd.h>
-#include <sqlite3.h>
-
 typedef struct 
 {
 	// sqlite3
@@ -45,10 +38,12 @@ bool startWS(
 	WSConfig &config
 );
 
-void* doneWS(
+void doneWS(
 	WSConfig &config
 );
 
 bool checkDbConnection(WSConfig *config);
+
+bool createTables(WSConfig &config);
 
 #endif
