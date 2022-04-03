@@ -109,27 +109,50 @@ const char *paths[PATH_COUNT] = {
 	"/t"
 };
 
-const char *pathSelect[PATH_COUNT] = {
-	"SELECT id, raw, devname, loraaddr, received FROM logger_raw "
+const char *pathSelectPrefix[PATH_COUNT] = {
+	"SELECT id, raw, devname, loraaddr, received FROM logger_raw",
+	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora"
+};
+
+const char *pathSelectSuffix[PATH_COUNT] = {
 	"ORDER BY id LIMIT ?1, ?2;",
-	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora "
 	"ORDER BY id LIMIT ?1, ?2;"
 };
 
 #define QUERY_PARAMS_SIZE 15
-#define QUERY_PARAMS_MAX 5
+#define QUERY_PARAMS_OPTIONAL_MIN	2
+#define QUERY_PARAMS_OPTIONAL_MAX	QUERY_PARAMS_SIZE - 1
 
+// first QUERY_PARAMS_REQUIRED_MAX = 3 parameters can be required
 static const char* queryParamNames[QUERY_PARAMS_SIZE] = {
 	"o",	    "s",		"id",		"start",	"finish",
 	"sensor",	"kosa", 	"year",		"name",		"t",
 	"vcc",		"vbat",		"devname",	"loraaddr",	"received"
 };
 
-#define EOP -1
+static const bool queryParamIsString[QUERY_PARAMS_SIZE] = {
+	false,	    false,		false,		false,		false,
+	false,	    false,		false,		true,		false,
+	false,	    false,		true,		true,		true
+};
 
-const int pathParams[PATH_COUNT][QUERY_PARAMS_MAX] = {
-	{ 0, 1, EOP, 0, 0 },
-	{ 0, 1, EOP, 0, 0 }
+#define SQL_STRING_QUOTE	"\'"
+
+#define QUERY_PARAMS_SUFFIX_SIZE	4
+static const char* queryParamSuffix[QUERY_PARAMS_SUFFIX_SIZE] = {
+	"-gt",	    "-ge",		"-lt",		"-le"
+};
+
+static const char* queryParamSQLComparisonOperator[QUERY_PARAMS_SUFFIX_SIZE] = {
+	">",	    ">=",		"<",		"<="
+};
+
+#define EOP -1
+#define QUERY_PARAMS_REQUIRED_MAX 3
+
+const int pathRequiredParams[PATH_COUNT][QUERY_PARAMS_REQUIRED_MAX] = {
+	{ 0, 1, EOP },
+	{ 0, 1, EOP }
 };
 
 const static char *MSG404 = "404 not found";
@@ -319,19 +342,70 @@ static START_FETCH_DB_RESULT startFetchDb(
 	RequestEnv *env
 )
 {
-	int r = sqlite3_prepare_v2(env->db,
-		pathSelect[env->request.requestType], -1, &env->stmt, NULL);
+	std::stringstream pathSelectSS;
+	pathSelectSS << pathSelectPrefix[env->request.requestType];
+
+	// build WHERE clause
+	
+	bool isFirst = true;
+	for (int i = QUERY_PARAMS_OPTIONAL_MIN; i <= QUERY_PARAMS_OPTIONAL_MAX; i++) {
+		std::string pn = queryParamNames[i];
+		const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pn.c_str());
+		if (c) {
+			// equals
+			if (isFirst) {
+				pathSelectSS << " WHERE ";
+				isFirst = false;
+			} else {
+				pathSelectSS << " AND ";
+			}
+			pathSelectSS << pn << " = ";
+			if (queryParamIsString[i])
+				pathSelectSS << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
+			else
+				pathSelectSS << c;
+			// do not check other contitions
+			continue;
+		}
+		for (int pns = 0; pns < QUERY_PARAMS_SUFFIX_SIZE; pns++) {
+			std::string pnc = pn + queryParamSuffix[pns];
+			const char* cc = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pnc.c_str());
+			if (cc) {
+				if (isFirst) {
+					pathSelectSS << " WHERE ";
+					isFirst = false;
+				} else
+					pathSelectSS << " AND ";
+				pathSelectSS << pn << " " << queryParamSQLComparisonOperator[pns] << " ";
+				if (queryParamIsString[i])
+					pathSelectSS << SQL_STRING_QUOTE << cc << SQL_STRING_QUOTE;
+				else
+					pathSelectSS << cc;
+				// Do not break, check other contitions
+				// break;
+			}
+		}
+	}
+
+	// finish WHERE clause
+	pathSelectSS << " " << pathSelectSuffix[env->request.requestType];
+	std::string pathSelect = pathSelectSS.str();
+
+	// preparation
+	int r = sqlite3_prepare_v2(env->db, pathSelect.c_str(), -1, &env->stmt, NULL);
 	if (r) {
 		if (logstream)
 			*logstream << "Error " << r 
 				<< ": " << sqlite3_errmsg(env->db)
 				<< " db " << env->config->dbfilename 
-				<< " SQL " << pathSelect[env->request.requestType]
+				<< " SQL " << pathSelect.c_str()
 				<< std::endl;
 		return START_FETCH_DB_PREPARE_FAILED;
 	}
-	for (int i = 0; i < QUERY_PARAMS_MAX; i++)	{
-		int v = pathParams[env->request.requestType][i];
+
+	// bind required params
+	for (int i = 0; i < QUERY_PARAMS_REQUIRED_MAX; i++)	{
+		int v = pathRequiredParams[env->request.requestType][i];
 		if (v == EOP)
 			break; // no more parameters
 		const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);

@@ -8,13 +8,6 @@
 
 #define MHD_W32LIB	1	// static
 
-#ifdef _MSC_VER
-#define FMT_TIME	"%lld"
-#include "strptime.h"
-#else
-#define FMT_TIME	"%ld"
-#endif
-
 
 #ifndef _MHD_EXTERN 
 #if defined(_WIN32) && defined(MHD_W32LIB)
@@ -185,10 +178,4 @@ typedef MHD_socket MHD_pipe;
 #define IPPROTO_IPV6 IPPROTO_IPV6
 #endif
 
-#endif
-
-#ifdef _MSC_VER
-#include <Windows.h>
-#include <stdint.h> // portable: uint64_t   MSVC: __int64 
-int gettimeofday(struct timeval * tp, struct timezone * tzp);
 #endif
