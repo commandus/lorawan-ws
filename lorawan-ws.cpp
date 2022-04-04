@@ -26,13 +26,12 @@
 
 #include <sqlite3.h>
 #include <microhttpd.h>
+// Caution: version may be different, if microhttpd dependecy not compiled, revise versiuon humber
 #if MHD_VERSION <= 0x00096600
 #define MHD_Result int
 #endif
 
 #include "lorawan-ws.h"
-
-// static struct WSConfig config;
 
 std::ostream *logstream = NULL;
 
@@ -93,30 +92,61 @@ bool checkDbConnection(WSConfig *config)
 	return false;
 }
 
-#define PATH_COUNT 2
+#define PATH_COUNT 6
 
 typedef enum
 {
-	RT_RAW = 0,			//< List of coordinates
-	RT_T = 1,			//< List of device and their states
+	RT_RAW = 0,			//< List of raw
+	RT_T = 1,			//< List of values(temperatures)
+	RT_RAW_COUNT = 2,	//> Count of raw records
+	RT_T_COUNT = 3,		//> Count of value records
+	RT_RAW_1 = 4,		//> One raw record (by id)
+	RT_T_1 = 5,			//> One value record (by id)
 	RT_UNKNOWN = 100	//< file request
 
 } RequestType;
 
-
 const char *paths[PATH_COUNT] = {
 	"/raw",
-	"/t"
-};
+	"/t",
+	"/raw-count",
+	"/t-count",
+	"/raw-id",
+	"/t-id"};
+
+typedef enum
+{
+	CT_ID = 0,			//< Id
+	CT_KOSA = 1,		//< Kosa
+	CT_YEAR = 2,		//> Kosa year
+	CT_NO = 3,			//> Number
+	CT_MEASURED = 4,	//> Measured time
+	CT_PARSED = 5,		//> Parsed time
+	CT_VCC = 6,			//> Vcc
+	CT_VBAT = 7,		//> Vbat 
+	CT_T = 8,			//> Measured temperature
+	CT_RAW = 9,			//> raw packets in hex
+	CT_DEVNAME = 10,	//> 
+	CT_LORAADDR = 11,	//> 
+	CT_RECEIVED = 12	//> 
+} ColumnTemperature;
 
 const char *pathSelectPrefix[PATH_COUNT] = {
 	"SELECT id, raw, devname, loraaddr, received FROM logger_raw",
-	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora"
+	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora",
+	"SELECT count(id) cnt FROM logger_raw",
+	"SELECT count(id) cnt FROM logger_lora",
+	"SELECT id, raw, devname, loraaddr, received FROM logger_raw WHERE id = ?1",
+	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora WHERE id = ?1"
 };
 
 const char *pathSelectSuffix[PATH_COUNT] = {
 	"ORDER BY id LIMIT ?1, ?2;",
-	"ORDER BY id LIMIT ?1, ?2;"
+	"ORDER BY id LIMIT ?1, ?2;",
+	"",
+	"",
+	"",
+	""
 };
 
 #define QUERY_PARAMS_SIZE 15
@@ -130,6 +160,7 @@ static const char* queryParamNames[QUERY_PARAMS_SIZE] = {
 	"vcc",		"vbat",		"devname",	"loraaddr",	"received"
 };
 
+
 static const bool queryParamIsString[QUERY_PARAMS_SIZE] = {
 	false,	    false,		false,		false,		false,
 	false,	    false,		false,		true,		false,
@@ -139,6 +170,7 @@ static const bool queryParamIsString[QUERY_PARAMS_SIZE] = {
 #define SQL_STRING_QUOTE	"\'"
 
 #define QUERY_PARAMS_SUFFIX_SIZE	4
+
 static const char* queryParamSuffix[QUERY_PARAMS_SUFFIX_SIZE] = {
 	"-gt",	    "-ge",		"-lt",		"-le"
 };
@@ -152,16 +184,19 @@ static const char* queryParamSQLComparisonOperator[QUERY_PARAMS_SUFFIX_SIZE] = {
 
 const int pathRequiredParams[PATH_COUNT][QUERY_PARAMS_REQUIRED_MAX] = {
 	{ 0, 1, EOP },
-	{ 0, 1, EOP }
+	{ 0, 1, EOP },
+	{ EOP, 0, 0 },
+	{ EOP, 0, 0 },
+	{ 2, EOP, 0 },
+	{ 2, EOP, 0 }
 };
 
 const static char *MSG404 = "404 not found";
-const static char *dateformat = "%FT%T";
-const static char *dateformatview = "%F %T";
 const static char *CT_HTML = "text/html;charset=UTF-8";
 const static char *CT_JSON = "text/javascript;charset=UTF-8";
 const static char *CT_KML = "application/vnd.google-earth.kml+xml";
-const static char *CT_TILE = "image/png";
+const static char *CT_PNG = "image/png";
+const static char *CT_JPEG = "image/jpeg";
 const static char *CT_CSS = "text/css";
 const static char *CT_TEXT = "text/plain;charset=UTF-8";
 const static char *CT_TTF = "font/ttf";
@@ -273,6 +308,17 @@ static const char *mimeTypeByFileExtention(const std::string &filename)
 	else
 		if (ext == "css")
 			return CT_CSS;
+	if (ext == "png")
+		return CT_PNG;
+	else
+		if (ext == "jpg")
+			return CT_JPEG;
+	else
+		if (ext == "jpeg")
+			return CT_JPEG;
+	else
+		if (ext == "kml")
+			return CT_KML;
 	else
 		if (ext == "txt")
 			return CT_TEXT;
@@ -344,45 +390,46 @@ static START_FETCH_DB_RESULT startFetchDb(
 {
 	std::stringstream pathSelectSS;
 	pathSelectSS << pathSelectPrefix[env->request.requestType];
-
-	// build WHERE clause
-	
-	bool isFirst = true;
-	for (int i = QUERY_PARAMS_OPTIONAL_MIN; i <= QUERY_PARAMS_OPTIONAL_MAX; i++) {
-		std::string pn = queryParamNames[i];
-		const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pn.c_str());
-		if (c) {
-			// equals
-			if (isFirst) {
-				pathSelectSS << " WHERE ";
-				isFirst = false;
-			} else {
-				pathSelectSS << " AND ";
-			}
-			pathSelectSS << pn << " = ";
-			if (queryParamIsString[i])
-				pathSelectSS << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
-			else
-				pathSelectSS << c;
-			// do not check other contitions
-			continue;
-		}
-		for (int pns = 0; pns < QUERY_PARAMS_SUFFIX_SIZE; pns++) {
-			std::string pnc = pn + queryParamSuffix[pns];
-			const char* cc = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pnc.c_str());
-			if (cc) {
+	// get by identifier- no optional conditions
+	if (!((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1))) {
+		// build WHERE clause
+		bool isFirst = true;
+		for (int i = QUERY_PARAMS_OPTIONAL_MIN; i <= QUERY_PARAMS_OPTIONAL_MAX; i++) {
+			std::string pn = queryParamNames[i];
+			const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pn.c_str());
+			if (c) {
+				// equals
 				if (isFirst) {
 					pathSelectSS << " WHERE ";
 					isFirst = false;
-				} else
+				} else {
 					pathSelectSS << " AND ";
-				pathSelectSS << pn << " " << queryParamSQLComparisonOperator[pns] << " ";
+				}
+				pathSelectSS << pn << " = ";
 				if (queryParamIsString[i])
-					pathSelectSS << SQL_STRING_QUOTE << cc << SQL_STRING_QUOTE;
+					pathSelectSS << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
 				else
-					pathSelectSS << cc;
-				// Do not break, check other contitions
-				// break;
+					pathSelectSS << c;
+				// do not check other contitions
+				continue;
+			}
+			for (int pns = 0; pns < QUERY_PARAMS_SUFFIX_SIZE; pns++) {
+				std::string pnc = pn + queryParamSuffix[pns];
+				const char* cc = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pnc.c_str());
+				if (cc) {
+					if (isFirst) {
+						pathSelectSS << " WHERE ";
+						isFirst = false;
+					} else
+						pathSelectSS << " AND ";
+					pathSelectSS << pn << " " << queryParamSQLComparisonOperator[pns] << " ";
+					if (queryParamIsString[i])
+						pathSelectSS << SQL_STRING_QUOTE << cc << SQL_STRING_QUOTE;
+					else
+						pathSelectSS << cc;
+					// Do not break, check other contitions
+					// break;
+				}
 			}
 		}
 	}
@@ -395,7 +442,7 @@ static START_FETCH_DB_RESULT startFetchDb(
 	int r = sqlite3_prepare_v2(env->db, pathSelect.c_str(), -1, &env->stmt, NULL);
 	if (r) {
 		if (logstream)
-			*logstream << "Error " << r 
+			*logstream << "Fetch error " << r 
 				<< ": " << sqlite3_errmsg(env->db)
 				<< " db " << env->config->dbfilename 
 				<< " SQL " << pathSelect.c_str()
@@ -478,10 +525,14 @@ static size_t result2json(
 		else
 			ss << ", ";
 		ss << "\"" << n << "\": ";
-		if (t == SQLITE_TEXT) 
-			ss << "\"" << v << "\"";
-		else
-			ss << v;
+		if (c == (int) CT_T) {
+			ss << "[" << v << "]";
+		} else {
+			if (t == SQLITE_TEXT) 
+				ss << "\"" << v << "\"";
+			else
+				ss << v;
+		}
 	}
 	std::string s = ss.str();
 	sz = s.size();
@@ -545,14 +596,12 @@ static MHD_Result request_callback(
 	requestenv->db = (sqlite3 *) requestenv->config->db;
 	requestenv->request.requestType = parseRequestType(url);
 
-	char *buf;
 	if (requestenv->request.requestType == RT_UNKNOWN) {
 			std::string fn = buildFileName(requestenv->config->dirRoot, url);
 			return processFile(connection, fn);
 	}
 
 	int r = (int) startFetchDb(connection, requestenv);
-	char *msg;
 	int hc;
 	if (r) {
 		hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
