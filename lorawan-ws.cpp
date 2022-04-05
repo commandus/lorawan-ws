@@ -201,6 +201,8 @@ const static char *CT_CSS = "text/css";
 const static char *CT_TEXT = "text/plain;charset=UTF-8";
 const static char *CT_TTF = "font/ttf";
 const static char *CT_BIN = "application/octet";
+const static char *HDR_CORS = "*";
+
 
 typedef enum {
 	START_FETCH_DB_OK = 0,
@@ -611,6 +613,8 @@ static MHD_Result request_callback(
 		response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv, &chunk_done_callback);
 	}
 	MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
+	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS);
+	
 	ret = MHD_queue_response(connection, hc, response);
 	MHD_destroy_response(response);
 	return ret;
