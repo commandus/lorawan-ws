@@ -201,8 +201,10 @@ const static char *CT_CSS = "text/css";
 const static char *CT_TEXT = "text/plain;charset=UTF-8";
 const static char *CT_TTF = "font/ttf";
 const static char *CT_BIN = "application/octet";
-const static char *HDR_CORS = "*";
-
+const static char *HDR_CORS_ORIGIN = "*";
+const static char *HDR_CORS_CREDENTIALS = "true";
+const static char *HDR_CORS_METHODS = "GET,HEAD,OPTIONS,POST,PUT";
+const static char *HDR_CORS_HEADERS = "Authentication, Access-Control-Allow-Headers, Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers";
 
 typedef enum {
 	START_FETCH_DB_OK = 0,
@@ -588,8 +590,12 @@ static MHD_Result request_callback(
 		return MHD_YES;
 	}
 
-	if (strcmp(method, "GET") != 0)
-		return MHD_NO;              // unexpected method
+	if (strcmp(method, "PUT") == 0)
+		return MHD_NO;              // not implemenmted
+	if (strcmp(method, "DELETE") == 0)
+		return MHD_NO;              // not implemenmted
+	// GET POST HEAD CONNECT OPTIONS TRACE PATCH
+		
 	*ptr = NULL;					// reset when done
 
 	RequestEnv *requestenv = (RequestEnv *) malloc(sizeof(RequestEnv));
@@ -613,7 +619,10 @@ static MHD_Result request_callback(
 		response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv, &chunk_done_callback);
 	}
 	MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
-	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS);
+	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS_ORIGIN);
+	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, HDR_CORS_CREDENTIALS);
+	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, HDR_CORS_METHODS);
+	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, HDR_CORS_HEADERS);
 	
 	ret = MHD_queue_response(connection, hc, response);
 	MHD_destroy_response(response);
