@@ -482,10 +482,10 @@ static START_FETCH_DB_RESULT startFetchDb(
 			}
 		}
 	}
-	/*
+	
 	if (logstream)
 		*logstream << "SQL " << pathSelect << std::endl;
-	*/
+	
 	return START_FETCH_DB_OK;
 }
 
