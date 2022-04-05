@@ -156,10 +156,9 @@ const char *pathSelectSuffix[PATH_COUNT] = {
 // first QUERY_PARAMS_REQUIRED_MAX = 3 parameters can be required
 static const char* queryParamNames[QUERY_PARAMS_SIZE] = {
 	"o",	    "s",		"id",		"start",	"finish",
-	"sensor",	"kosa", 	"year",		"name",		"t",
+	"sensor",	"kosa", 	"year",		"raw",		"t",
 	"vcc",		"vbat",		"devname",	"loraaddr",	"received"
 };
-
 
 static const bool queryParamIsString[QUERY_PARAMS_SIZE] = {
 	false,	    false,		false,		false,		false,
@@ -169,14 +168,14 @@ static const bool queryParamIsString[QUERY_PARAMS_SIZE] = {
 
 #define SQL_STRING_QUOTE	"\'"
 
-#define QUERY_PARAMS_SUFFIX_SIZE	4
+#define QUERY_PARAMS_SUFFIX_SIZE	5
 
 static const char* queryParamSuffix[QUERY_PARAMS_SUFFIX_SIZE] = {
-	"-gt",	    "-ge",		"-lt",		"-le"
+	"-gt",	    "-ge",		"-lt",		"-le",		"-like"
 };
 
 static const char* queryParamSQLComparisonOperator[QUERY_PARAMS_SUFFIX_SIZE] = {
-	">",	    ">=",		"<",		"<="
+	">",	    ">=",		"<",		"<=",		"LIKE"
 };
 
 #define EOP -1
@@ -239,7 +238,7 @@ typedef struct
 {
 	RequestParams request;
 	sqlite3 *db;		// each request in separate connection
-	sqlite3_stmt *stmt;	// SQL statement
+	sqlite3_stmt *stmt;	// SQL statementSTART WITH 
 	WSConfig *config;
 	OutputState state;
 } RequestEnv;
@@ -483,6 +482,10 @@ static START_FETCH_DB_RESULT startFetchDb(
 			}
 		}
 	}
+	/*
+	if (logstream)
+		*logstream << "SQL " << pathSelect << std::endl;
+	*/
 	return START_FETCH_DB_OK;
 }
 
