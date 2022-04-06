@@ -20,9 +20,17 @@ set(WS_SQLITE_SOURCES
 	third_party/argtable3/argtable3.c
 )
 
+set(LIB_LORAWAN_WS_SRC
+	lorawan-ws.cpp
+)
+
 add_executable(ws-sqlite ${WS_SQLITE_SOURCES})
 target_link_libraries(ws-sqlite PRIVATE Threads::Threads
 	${DB_LIB} ${HTTPD_LIB}
+)
+
+add_library(lorawan STATIC
+	${LIB_LORAWAN_WS_SRC}
 )
 
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/ws-sqlite DESTINATION cmake)
