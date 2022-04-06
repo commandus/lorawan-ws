@@ -141,8 +141,8 @@ const char *pathSelectPrefix[PATH_COUNT] = {
 };
 
 const char *pathSelectSuffix[PATH_COUNT] = {
-	"ORDER BY id LIMIT ?1, ?2;",
-	"ORDER BY id LIMIT ?1, ?2;",
+	"ORDER BY id DESC LIMIT ?1, ?2;",
+	"ORDER BY id DESC LIMIT ?1, ?2;",
 	"",
 	"",
 	"",
@@ -155,8 +155,8 @@ const char *pathSelectSuffix[PATH_COUNT] = {
 
 // first QUERY_PARAMS_REQUIRED_MAX = 3 parameters can be required
 static const char* queryParamNames[QUERY_PARAMS_SIZE] = {
-	"o",	    "s",		"id",		"start",	"finish",
-	"sensor",	"kosa", 	"year",		"raw",		"t",
+	"o",	    "s",		"id",		"measured",	"parsed",
+	"no"	,	"kosa", 	"year",		"raw",		"t",
 	"vcc",		"vbat",		"devname",	"loraaddr",	"received"
 };
 
