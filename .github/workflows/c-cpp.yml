@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: libs libmicrohttpd
-    - run: sudo apt install -y libmicrohttpd-dev
+      run: sudo apt install -y libmicrohttpd-dev
     - name: autogen
       run: ./autogen.sh
     - name: configure
