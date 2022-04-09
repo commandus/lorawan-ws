@@ -150,7 +150,7 @@ kosa-ge=11&kosa-le=22
 Установите зависимости:
 
 ```
-sudo apt install libmicrohttpd
+sudo apt install libmicrohttpd-dev
 sudo apt install libsqlite3-dev
 ```
 
