@@ -19,7 +19,7 @@ ws_sqlite_SOURCES = \
 	ws-sqlite.cpp lorawan-ws.cpp \
 	third_party/argtable3/argtable3.c
 ws_sqlite_LDADD = -lsqlite3 -lmicrohttpd
-ws_sqlite_CPPFLAGS = -I. -Ithird_party
+ws_sqlite_CPPFLAGS = -I. -Ithird_party -I../../third_party
 
 libws_sqlite_a_SOURCES = $(LIB_WS_SQLITE_SRC)
 libws_sqlite_a_CXXFLAGS = -I. -Ithird_party -fPIC

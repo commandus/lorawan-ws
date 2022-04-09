@@ -30,7 +30,16 @@
 #if MHD_VERSION <= 0x00096600
 #define MHD_Result int
 #endif
-
+#ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS "Access-Control-Allow-Credentials"
+#endif
+#ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS "Access-Control-Allow-Methods"
+#endif
+#ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS "Access-Control-Allow-Headers"
+#endif
+	
 #include "lorawan-ws.h"
 
 std::ostream *logstream = NULL;
