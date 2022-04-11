@@ -19,7 +19,7 @@ ws-sqlite - веб сервер HTTP/1.0
 ./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -c
 ```
 
-Запустите веб сервис, указав в опции -r путь к каталогу, где раземщены веб страницы.
+Запустите веб сервис, указав в опции -r путь к каталогу, где размещены веб страницы.
 
 ```
 ./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -r ../lorawan-ws-angular/lorawan-ws-angular/dist/lorawan-ws-angular -l 1.log
