@@ -9,6 +9,7 @@ nobase_dist_include_HEADERS = \
 	platform.h \
 	lorawan-ws.h \
 	third_party/argtable3/argtable3.h \
+	third_party/daemonize/daemonize.h \
 	third_party/lorawan-network-server/db-intf.h \
 	third_party/lorawan-network-server/db-sqlite.h
 	
@@ -17,7 +18,8 @@ LIB_WS_SQLITE_SRC = \
 
 ws_sqlite_SOURCES = \
 	ws-sqlite.cpp lorawan-ws.cpp \
-	third_party/argtable3/argtable3.c
+	third_party/argtable3/argtable3.c \
+	third_party/daemonize/daemonize.cpp
 ws_sqlite_LDADD = -lsqlite3 -lmicrohttpd
 ws_sqlite_CPPFLAGS = -I. -Ithird_party -I../../third_party
 

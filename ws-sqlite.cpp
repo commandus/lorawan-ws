@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string.h>
 #include <signal.h>
+#include <limits.h>
 
 #include <microhttpd.h>
 #include <sqlite3.h>
@@ -13,6 +14,8 @@
 #include "platform.h"
 
 #include "lorawan-ws.h"
+
+#include "daemonize/daemonize.h"
 
 const char *progname = "ws-sqlite";
 
@@ -57,6 +60,7 @@ int parseCmd
 (
 	WSConfig *retval,
 	bool &createTable,
+	bool &daemonize,
 	int argc,
 	char* argv[]
 )
@@ -66,6 +70,7 @@ int parseCmd
 	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
 	struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force create table in database");
+	struct arg_lit *a_daemonize = arg_lit0("d", "daemonize", "run daemon");
 	struct arg_lit *a_verbosity = arg_litn("v", "verbosity", 0, 4, "v- error, vv- warning, vvv, vvvv- debug");
 	struct arg_file *a_logfile = arg_file0("l", "log", "<file>", "log file");
 	
@@ -73,7 +78,7 @@ int parseCmd
 	struct arg_end *a_end = arg_end(20);
 
 	void* argtable[] = { a_listenport, a_dirroot, a_database, a_logfile,
-		a_create_table,
+		a_create_table, a_daemonize,
 		a_verbosity, a_help, a_end
 	};
 
@@ -102,6 +107,7 @@ int parseCmd
 	}
 
 	createTable = a_create_table->count > 0;
+	daemonize = a_daemonize->count > 0;
 
 	if (a_dirroot->count)
 		retval->dirRoot = *a_dirroot->sval;
@@ -140,13 +146,31 @@ int parseCmd
 	return 0;
 }
 
+static void done()
+{
+}
+
+static void start()
+{
+	if (!startWS(NUMBER_OF_THREADS, 1000, MHD_START_FLAGS, config)) {
+		std::cerr << "Can not start web service errno " 
+			<< errno << ": " << strerror(errno) << std::endl;
+			std::cerr << "libmicrohttpd version " << std::hex << MHD_VERSION << std::endl;
+	}
+}
+
+static void stop()
+{
+	doneWS(config);
+}
+
 void signalHandler(int signal)
 {
 	switch(signal)
 	{
 	case SIGINT:
 		std::cerr << "Interrupted..";
-		doneWS(config);
+		done();
 		exit(signal);
 	default:
 		std::cerr << "Signal " << signal;
@@ -165,9 +189,10 @@ void setSignalHandler(int signal)
 
 int main(int argc, char* argv[])
 {
-	WSConfig config;
 	bool createTable;
-	int r = parseCmd(&config, createTable, argc, argv);
+	bool daemonize;
+
+	int r = parseCmd(&config, createTable, daemonize, argc, argv);
 	if (createTable) {
 		createTables(config);
 		if (config.lasterr)
@@ -177,23 +202,24 @@ int main(int argc, char* argv[])
 	if (r)
 		exit(r);
 
-	// Signal handler
-	setSignalHandler(SIGINT);
-	if (config.verbosity)
-		std::cerr << "SQLite version " << SQLITE_VERSION << std::endl;
+	if (daemonize) {
+		char wd[PATH_MAX];
+		std::string progpath = getcwd(wd, PATH_MAX);
+		Daemonize daemonize(progname, progpath, start, stop, done);
+	} else {
+		// Signal handler
+		setSignalHandler(SIGINT);
+		if (config.verbosity)
+			std::cerr << "SQLite version " << SQLITE_VERSION << std::endl;
 
-	if (!startWS(NUMBER_OF_THREADS, 1000, MHD_START_FLAGS, config)) {
-		std::cerr << "Can not start web service errno " 
-			<< errno << ": " << strerror(errno) << std::endl;
-			std::cerr << "libmicrohttpd version " << std::hex << MHD_VERSION << std::endl;
-		return 1;
+		start();
+
+		while (true)
+		{
+			getc(stdin);
+		}
+		stop();
+		done();
 	}
-
-	while (true)
-	{
-		getc(stdin);
-	}
-
-	doneWS(config);
 	return 0;
 }
