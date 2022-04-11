@@ -18,6 +18,7 @@ include_directories("third_party" ${CURL_INCLUDE_DIR})
 set(WS_SQLITE_SOURCES
 	ws-sqlite.cpp lorawan-ws.cpp
 	third_party/argtable3/argtable3.c
+	third_party/daemonize/daemonize.cpp
 )
 
 set(LIB_LORAWAN_WS_SRC

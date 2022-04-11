@@ -16,10 +16,20 @@ ws-sqlite - веб сервер HTTP/1.0
 Опция -c создает новую базу данных с пустыми таблицами.
 
 ```
-ws-sqlite -d lora.db -c
+./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -c
 ```
 
-Откройте в браузере http://localhost:5002/t?o=0&s=2
+Запустите веб сервис, указав в опции -r путь к каталогу, где раземщены веб страницы.
+
+```
+./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -r ../lorawan-ws-angular/lorawan-ws-angular/dist/lorawan-ws-angular -l 1.log
+```
+
+Опция -l указывает записывать в файл журнала адреса загруженных из веб сервиса данных.
+
+Если задан корневой каталог опцией -r, откройте в браузере адрес http://localhost:5002/
+
+Если корневой каталог не задан, проверьте работу сервиса, открыв в браузере адрес http://localhost:5002/t?o=0&s=2
 
 Можете также использовать wget:
 ```
