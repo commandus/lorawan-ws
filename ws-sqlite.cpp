@@ -70,7 +70,7 @@ int parseCmd
 	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
 	struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force create table in database");
-	struct arg_lit *a_daemonize = arg_lit0("d", "daemonize", "run daemon");
+	struct arg_lit *a_daemonize = arg_lit0(NULL, "daemonize", "run daemon");
 	struct arg_lit *a_verbosity = arg_litn("v", "verbosity", 0, 4, "v- error, vv- warning, vvv, vvvv- debug");
 	struct arg_file *a_logfile = arg_file0("l", "log", "<file>", "log file");
 	
