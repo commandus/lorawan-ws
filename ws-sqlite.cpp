@@ -14,6 +14,8 @@
 #include "platform.h"
 
 #include "lorawan-ws.h"
+#include "lorawan-network-server/db-sqlite.h"
+#include "db-helper.h"
 
 #include "daemonize/daemonize.h"
 
@@ -39,7 +41,8 @@ const char *progname = "ws-sqlite";
 
 #define DEF_DB_FN "../lorawan-network-server/db/logger-huffman.db"
 
-WSConfig config;
+static WSConfig config;
+static DatabaseSQLite dbSqlite;
 
 std::string getPathFirstFragments(const std::string &value)
 {
@@ -59,6 +62,7 @@ std::string getPathFirstFragments(const std::string &value)
 int parseCmd
 (
 	WSConfig *retval,
+	std::string &retDbConnection,
 	bool &createTable,
 	bool &daemonize,
 	int argc,
@@ -128,16 +132,16 @@ int parseCmd
 	else
 		retval->port = DEF_PORT;
 
-	retval->dbfilename = *a_database->sval;
+	retDbConnection = *a_database->sval;
 
-	if ((!retval->dbfilename) || (strlen(retval->dbfilename) == 0))
-		retval->dbfilename = DEF_DB_FN;
+	if (retDbConnection.empty())
+		retDbConnection = DEF_DB_FN;
 
 	if (!createTable) {
 	// check database connection
-	if (!checkDbConnection(retval))
+	if (!checkDbConnection(retDbConnection))
 		{
-			fprintf(stderr, "Invalid database file %s\n", retval->dbfilename);
+			std::cerr << "Invalid database file " << retDbConnection << std::endl;
 			return 2;
 		}
 	}
@@ -148,6 +152,7 @@ int parseCmd
 
 static void done()
 {
+	dbSqlite.close();
 }
 
 static void start()
@@ -191,16 +196,22 @@ int main(int argc, char* argv[])
 {
 	bool createTable;
 	bool daemonize;
+	std::string dbFileName;
 
-	int r = parseCmd(&config, createTable, daemonize, argc, argv);
+	int r = parseCmd(&config, dbFileName, createTable, daemonize, argc, argv);
 	if (createTable) {
-		createTables(config);
+		createTables(dbFileName);
 		if (config.lasterr)
 			std::cerr << "Error create tables " << config.lasterr << std::endl;
 		exit(0);
 	}
 	if (r)
 		exit(r);
+
+
+	dbSqlite.open(dbFileName, "", "", "", 0);
+	config.databases[""] = &dbSqlite;
+	config.databases["sqlite"] = &dbSqlite;
 
 	if (daemonize) {
 		char wd[PATH_MAX];

@@ -6,8 +6,7 @@ bin_PROGRAMS=ws-sqlite
 lib_LIBRARIES = libws-sqlite.a
 
 nobase_dist_include_HEADERS = \
-	platform.h \
-	lorawan-ws.h \
+	platform.h lorawan-ws.h db-helper.h \
 	third_party/argtable3/argtable3.h \
 	third_party/daemonize/daemonize.h \
 	third_party/lorawan-network-server/db-intf.h \
@@ -17,8 +16,9 @@ LIB_WS_SQLITE_SRC = \
 	lorawan-ws.cpp
 
 ws_sqlite_SOURCES = \
-	ws-sqlite.cpp lorawan-ws.cpp \
+	ws-sqlite.cpp lorawan-ws.cpp db-helper.cpp \
 	third_party/argtable3/argtable3.c \
+	third_party/lorawan-network-server/db-sqlite.cpp \
 	third_party/daemonize/daemonize.cpp
 ws_sqlite_LDADD = -lsqlite3 -lmicrohttpd
 ws_sqlite_CPPFLAGS = -I. -Ithird_party -I../../third_party
