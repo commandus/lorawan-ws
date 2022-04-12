@@ -24,7 +24,7 @@ ws_sqlite_LDADD = -lsqlite3 -lmicrohttpd
 ws_sqlite_CPPFLAGS = -I. -Ithird_party -I../../third_party
 
 libws_sqlite_a_SOURCES = $(LIB_WS_SQLITE_SRC)
-libws_sqlite_a_CXXFLAGS = -I. -Ithird_party -fPIC
+libws_sqlite_a_CXXFLAGS = -I. -Ithird_party -I../../third_party -fPIC
 
 configdir = $(datadir)
 dist_config_DATA = \
