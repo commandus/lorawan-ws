@@ -252,4 +252,3 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=D:/git/vcpkg/scripts/buildsystems/vcpkg.cmake -D
 ```
 
 Запустите созданное решение в Visual Studio, выберите конфигурацию Release и соберите проект ws-sqlite.
-
