@@ -254,8 +254,6 @@ int Daemonize::init()
 int Daemonize::setFdLimit(int value)
 {
     struct rlimit lim;
-    int status;
-
     // current limit
     lim.rlim_cur = value;
     // max limit
