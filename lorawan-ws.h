@@ -3,15 +3,19 @@
  */
 
 #ifndef LORAWANWS_H_
-#define LORAWANWS_H_
+#define LORAWANWS_H_	1
 
+#include <map>
+#include <string>
 #include <iostream>
 #include <fstream>
 
+#include "lorawan-network-server/db-intf.h"
+
+typedef std::map<std::string, DatabaseIntf*> MAP_NAME_DATABASE;
+
 typedef struct 
 {
-	// sqlite3
-	const char *dbfilename;
 	// listener port
 	int port;
 	// last error code
@@ -22,8 +26,8 @@ typedef struct
 	int verbosity;
 	// web server descriptor
 	void *descriptor;
-	// sqlite3 descriptor
-	void *db;
+	// databases
+	MAP_NAME_DATABASE databases;
 } WSConfig;
 
 void setLogFile(std::ostream* value);
@@ -32,6 +36,7 @@ void setLogFile(std::ostream* value);
  * @param threadCount threads count, e.g. 2
  * @param connectionLimit mex connection limit, e.g. 1000
  * @param flags e.g. MHD_SUPPRESS_DATE_NO_CLOCK | MHD_USE_DEBUG | MHD_USE_SELECT_INTERNALLY
+ * @param config listener descriptors, port number
  */ 
 bool startWS(
 	unsigned int threadCount,
@@ -43,9 +48,5 @@ bool startWS(
 void doneWS(
 	WSConfig &config
 );
-
-bool checkDbConnection(WSConfig *config);
-
-bool createTables(WSConfig &config);
 
 #endif
