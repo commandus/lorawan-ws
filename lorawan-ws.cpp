@@ -38,16 +38,20 @@
 #ifndef MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS "Access-Control-Allow-Headers"
 #endif
-	
+
+#define	LOG_ERR								1
+#define	LOG_INFO							2
+#define	LOG_DEBUG							3
+
+#define MODULE_WS	200
+
 #include "lorawan-ws.h"
 
-std::ostream *logstream = NULL;
+LOG_CALLBACK logCB = NULL;
 
-void setLogFile(std::ostream* value)
+void setLogCallback(LOG_CALLBACK value)
 {
-	if ((value == NULL) && (logstream))
-		delete logstream;
-	logstream = value;
+	logCB = value;
 }
 
 #define PATH_COUNT 6
@@ -226,8 +230,8 @@ const char *requestTypeString(RequestType value)
 
 void *uri_logger_callback (void *cls, const char *uri)
 {
-	if (logstream)
-		*logstream <<  uri << std::endl;
+	if (logCB)
+		logCB(cls, LOG_INFO, 0, 0, uri);
 	return NULL;
 }
 
@@ -239,10 +243,8 @@ static int doneFetch(
 		return 0;
 	int r = env->db->cursorClose(env->stmt);
 	if (r) {
-		if (logstream)
-			*logstream << "Cursor close error " << r 
-				<< ": " << env->db->errmsg
-				<< std::endl;
+		if (logCB)
+			logCB(env, LOG_ERR, MODULE_WS, r, "Cursor close error " + env->db->errmsg);
 		return START_FETCH_DB_PREPARE_FAILED;
 	}
 	env->stmt = NULL;
@@ -314,8 +316,8 @@ static MHD_Result processFile(struct MHD_Connection *connection, const std::stri
 	else
 		file = NULL;
 	if (file == NULL) {
-		if (logstream)
-			*logstream << "E404: " << fn << std::endl;
+		if (logCB)
+			logCB(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(fn));
 
 		response = MHD_create_response_from_buffer(strlen(MSG404), (void *) MSG404, MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response (connection, MHD_HTTP_NOT_FOUND, response);
@@ -411,12 +413,14 @@ static START_FETCH_DB_RESULT startFetchDb(
 	// preparation
 	int r = env->db->cursorOpen(&env->stmt, pathSelect);
 	if (r) {
-		if (logstream)
-			*logstream << "Fetch error " << r 
+		if (logCB) {
+			std::stringstream ss;
+			ss << "Fetch error " << r 
 				<< ": " << env->db->errmsg
 				<< " db " << env->db->type
-				<< " SQL " << pathSelect.c_str()
-				<< std::endl;
+				<< " SQL " << pathSelect.c_str();
+			logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+		}
 		return START_FETCH_DB_PREPARE_FAILED;
 	}
 
@@ -427,31 +431,32 @@ static START_FETCH_DB_RESULT startFetchDb(
 			break; // no more parameters
 		const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);
 		if (!c) {
-			if (logstream)
-				*logstream << "Binding parameter " 
-						<< "#" << i + 1
-						<< " " << queryParamNames[v]
-						<< " empty" << std::endl;
+			if (logCB) {
+				std::stringstream ss;
+				ss << "Binding parameter #" << i + 1
+					<< " " << queryParamNames[v]
+					<< " empty";
+				logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+			}
 			env->db->cursorClose(env->stmt);
 			return START_FETCH_DB_NO_PARAM;
 		} else {	
 			r = env->db->cursorBindText(env->stmt, i + 1, c);
 			if (r) {
-				if (logstream)
-					*logstream << "Bind parameter error " 
+				if (logCB) {
+					std::stringstream ss;
+					ss << "Bind parameter error "
 						<< r << ": " << env->db->errmsg
 						<< ", parameter #" << i + 1
 						<< " " << queryParamNames[v]
-						<< " = " << c << std::endl;
+						<< " = " << c;
+					logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+				}
 				env->db->cursorClose(env->stmt);
 				return START_FETCH_DB_BIND_PARAM;
 			}
 		}
 	}
-	
-	if (logstream)
-		*logstream << "SQL " << pathSelect << std::endl;
-	
 	return START_FETCH_DB_OK;
 }
 
@@ -522,11 +527,12 @@ static ssize_t chunk_callbackFetchDb(void *cls, uint64_t pos, char *buf, size_t 
 
 	bool r = env->db->cursorNext(env->stmt);
 	if (!r) {
-		if (logstream)
-			*logstream << "cursor next error " << r
-				<< ": " << env->db->errmsg
-				<< std::endl;
-
+		if (logCB) {
+			std::stringstream ss;
+			ss << "cursor next error " << r
+				<< ": " << env->db->errmsg;
+			logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+		}
 		env->state.state = env->state.state == 0 ? 3 : 2;
 	}
 	return result2json(buf, max, env);
@@ -626,29 +632,43 @@ static MHD_Result request_callback(
 }
 
 bool startWS(
-	unsigned int threadCount,
-	unsigned int connectionLimit,
-	unsigned int flags,
 	WSConfig &config
 ) {
+	if (config.flags == 0)
+		config.flags = MHD_START_FLAGS;
+		
 	struct MHD_Daemon *d = MHD_start_daemon(
-		flags, config.port, NULL, NULL, 
+		config.flags, config.port, NULL, NULL, 
 		&request_callback, &config,
 		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
-                MHD_OPTION_THREAD_POOL_SIZE, threadCount,
-                MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, NULL,
-                MHD_OPTION_CONNECTION_LIMIT, connectionLimit,
-                MHD_OPTION_END
+		MHD_OPTION_THREAD_POOL_SIZE, config.threadCount,
+		MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, NULL,
+		MHD_OPTION_CONNECTION_LIMIT, config.connectionLimit,
+		MHD_OPTION_END
 	);
 	config.descriptor = (void *) d;
+	setLogCallback(config.onLog);
+	if (logCB) {
+		if (config.descriptor) {
+			logCB(&config, LOG_INFO, MODULE_WS, 0, "web service started");
+		} else {
+			std::stringstream ss;
+			ss << "Start web service error " << errno
+				<< ": " << strerror(errno);
+			logCB(&config, LOG_ERR, MODULE_WS, errno, ss.str());
+		}
+	}
 	return config.descriptor != NULL;
 }
 
 void doneWS(
 	WSConfig &config
 ) {
+	setLogCallback(NULL);
 	if (config.descriptor)
 		MHD_stop_daemon((struct MHD_Daemon *) config.descriptor);
+	if (logCB) {
+		logCB(&config, LOG_INFO, MODULE_WS, 0, "web service stopped");
+	}
 	config.descriptor = NULL;
-	setLogFile(NULL);
 }

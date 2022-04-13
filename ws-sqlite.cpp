@@ -21,8 +21,6 @@
 
 const char *progname = "ws-sqlite";
 
-#define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
-
 /**
  * Number of threads to run in the thread pool.  Should (roughly) match
  * the number of cores on your system.
@@ -43,6 +41,7 @@ const char *progname = "ws-sqlite";
 
 static WSConfig config;
 static DatabaseSQLite dbSqlite;
+static std::ofstream *logFileStrm = NULL;
 
 std::string getPathFirstFragments(const std::string &value)
 {
@@ -51,6 +50,18 @@ std::string getPathFirstFragments(const std::string &value)
 		return value.substr(0, last_slash_idx);
 	else
 		return value;
+}
+
+static void onLogFile(
+	void *env,
+	int level,
+	int modulecode,
+	int errorcode,
+	const std::string &message
+)
+{
+	if (logFileStrm)
+		*logFileStrm << errorcode << "\t" << message << std::endl;
 }
 
 /**
@@ -120,11 +131,16 @@ int parseCmd
 
 	retval->verbosity = a_verbosity->count;
 
+	retval->threadCount = NUMBER_OF_THREADS;
+	retval->connectionLimit = 1024;
+	retval->flags = MHD_START_FLAGS;
+
 	if (a_logfile->count)
 	{
-		std::ostream *f = new std::ofstream(*a_logfile->filename);
-		if (f)
-			setLogFile(f);
+		logFileStrm = new std::ofstream(*a_logfile->filename);
+		if (logFileStrm) {
+			setLogCallback(onLogFile);
+		}
 	}
 
 	if (a_listenport->count)
@@ -153,11 +169,15 @@ int parseCmd
 static void done()
 {
 	dbSqlite.close();
+	if (logFileStrm) {
+		delete logFileStrm;
+		logFileStrm = NULL;
+	}
 }
 
 static void start()
 {
-	if (!startWS(NUMBER_OF_THREADS, 1000, MHD_START_FLAGS, config)) {
+	if (!startWS(config)) {
 		std::cerr << "Can not start web service errno " 
 			<< errno << ": " << strerror(errno) << std::endl;
 			std::cerr << "libmicrohttpd version " << std::hex << MHD_VERSION << std::endl;
