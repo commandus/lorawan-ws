@@ -134,13 +134,11 @@ int parseCmd
 	retval->threadCount = NUMBER_OF_THREADS;
 	retval->connectionLimit = 1024;
 	retval->flags = MHD_START_FLAGS;
+	retval->onLog = onLogFile;
 
 	if (a_logfile->count)
 	{
 		logFileStrm = new std::ofstream(*a_logfile->filename);
-		if (logFileStrm) {
-			setLogCallback(onLogFile);
-		}
 	}
 
 	if (a_listenport->count)

@@ -526,12 +526,6 @@ static ssize_t chunk_callbackFetchDb(void *cls, uint64_t pos, char *buf, size_t 
 
 	bool r = env->db->cursorNext(env->stmt);
 	if (!r) {
-		if (logCB) {
-			std::stringstream ss;
-			ss << "cursor next error " << r
-				<< ": " << env->db->errmsg;
-			logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
-		}
 		env->state.state = env->state.state == 0 ? 3 : 2;
 	}
 	return result2json(buf, max, env);
