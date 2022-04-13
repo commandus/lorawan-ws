@@ -7,15 +7,29 @@
 
 #include <map>
 #include <string>
+#include <functional>
 #include <iostream>
 #include <fstream>
 
 #include "lorawan-network-server/db-intf.h"
 
+#define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
+
 typedef std::map<std::string, DatabaseIntf*> MAP_NAME_DATABASE;
 
-typedef struct 
-{
+typedef std::function<void(
+		void *env,
+		int level,
+		int modulecode,
+		int errorcode,
+		const std::string &message)> LOG_CALLBACK;
+
+
+typedef struct {
+	unsigned int threadCount;
+	unsigned int connectionLimit;
+	unsigned int flags;
+
 	// listener port
 	int port;
 	// last error code
@@ -28,9 +42,11 @@ typedef struct
 	void *descriptor;
 	// databases
 	MAP_NAME_DATABASE databases;
+
+	LOG_CALLBACK onLog;
 } WSConfig;
 
-void setLogFile(std::ostream* value);
+void setLogCallback(LOG_CALLBACK value);
 
 /**
  * @param threadCount threads count, e.g. 2
@@ -39,9 +55,6 @@ void setLogFile(std::ostream* value);
  * @param config listener descriptors, port number
  */ 
 bool startWS(
-	unsigned int threadCount,
-	unsigned int connectionLimit,
-	unsigned int flags,
 	WSConfig &config
 );
 
