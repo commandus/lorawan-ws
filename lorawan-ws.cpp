@@ -39,9 +39,8 @@
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS "Access-Control-Allow-Headers"
 #endif
 
-#define	LOG_ERR								1
-#define	LOG_INFO							2
-#define	LOG_DEBUG							3
+#define	LOG_ERR								3
+#define	LOG_INFO							5
 
 #define MODULE_WS	200
 
@@ -636,7 +635,7 @@ bool startWS(
 ) {
 	if (config.flags == 0)
 		config.flags = MHD_START_FLAGS;
-		
+
 	struct MHD_Daemon *d = MHD_start_daemon(
 		config.flags, config.port, NULL, NULL, 
 		&request_callback, &config,
