@@ -1,4 +1,4 @@
-# LoraWAN web service
+# lorawan - LoraWAN web service
 
 ![lorawan-ws](res/lorawan-ws.png)
 
