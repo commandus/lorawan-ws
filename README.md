@@ -1,5 +1,6 @@
-# ws-sqlite
+# LoraWAN web service
 
+![lorawan-ws](res/lorawan-ws.png)
 
 Библиотека и утилита командной строки- встроенный веб сервер для работы с термокосами.
 
