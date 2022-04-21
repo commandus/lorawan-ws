@@ -94,11 +94,11 @@ typedef enum
 
 const char *pathSelectPrefix[PATH_COUNT] = {
 	"SELECT id, raw, devname, loraaddr, received FROM logger_raw",
-	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora",
+	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, tp, raw, devname, loraaddr, received FROM logger_lora",
 	"SELECT count(id) cnt FROM logger_raw",
 	"SELECT count(id) cnt FROM logger_lora",
 	"SELECT id, raw, devname, loraaddr, received FROM logger_raw WHERE id = ?1",
-	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, raw, devname, loraaddr, received FROM logger_lora WHERE id = ?1"
+	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, tp, raw, devname, loraaddr, received FROM logger_lora WHERE id = ?1"
 };
 
 const char *pathSelectSuffix[PATH_COUNT] = {
