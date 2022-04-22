@@ -86,10 +86,11 @@ typedef enum
 	CT_VCC = 6,			//> Vcc
 	CT_VBAT = 7,		//> Vbat 
 	CT_T = 8,			//> Measured temperature
-	CT_RAW = 9,			//> raw packets in hex
-	CT_DEVNAME = 10,	//> 
-	CT_LORAADDR = 11,	//> 
-	CT_RECEIVED = 12	//> 
+	CT_TP = 9,			//> Calculated temperature
+	CT_RAW = 10,			//> raw packets in hex
+	CT_DEVNAME = 11,	//> 
+	CT_LORAADDR = 12,	//> 
+	CT_RECEIVED = 13	//> 
 } ColumnTemperature;
 
 const char *pathSelectPrefix[PATH_COUNT] = {
@@ -502,13 +503,16 @@ static size_t result2json(
 		else
 			ss << ", ";
 		ss << "\"" << n << "\": ";
-		if (c == (int) CT_T) {
-			ss << "[" << v << "]";
-		} else {
-			if (t == DBT_TEXT) 
-				ss << "\"" << v << "\"";
-			else
-				ss << v;
+		switch (c) {
+			case CT_T:
+			case CT_TP:
+				ss << "[" << v << "]";
+				break;
+			default:
+				if (t == DBT_TEXT) 
+					ss << "\"" << v << "\"";
+				else
+					ss << v;
 		}
 	}
 	std::string s = ss.str();
