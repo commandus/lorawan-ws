@@ -581,9 +581,9 @@ static MHD_Result request_callback(
 	}
 
 	if (strcmp(method, "PUT") == 0)
-		return MHD_NO;              // not implemenmted
+		return MHD_NO;              // not implemented
 	if (strcmp(method, "DELETE") == 0)
-		return MHD_NO;              // not implemenmted
+		return MHD_NO;              // not implemented
 	// GET POST HEAD CONNECT OPTIONS TRACE PATCH
 		
 	*ptr = NULL;					// reset when done
