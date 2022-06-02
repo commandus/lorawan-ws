@@ -382,7 +382,7 @@ static START_FETCH_DB_RESULT startFetchDb(
 					pathSelectSS << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
 				else
 					pathSelectSS << c;
-				// do not check other contitions
+				// do not check other conditions
 				continue;
 			}
 			for (int pns = 0; pns < QUERY_PARAMS_SUFFIX_SIZE; pns++) {
