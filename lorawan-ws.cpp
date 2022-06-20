@@ -46,11 +46,24 @@
 
 #include "lorawan-ws.h"
 
-LOG_CALLBACK logCB = NULL;
+static void *context = nullptr;
+static LOG_CALLBACK logCB = nullptr;
+static SPECIAL_PATH_HANDLER_CALLBACK specialPathHandler = nullptr;
 
-void setLogCallback(LOG_CALLBACK value)
+void setLogCallback(
+    LOG_CALLBACK value
+)
 {
 	logCB = value;
+}
+
+void setSpecialPathHandler(
+    void *aContext,
+    SPECIAL_PATH_HANDLER_CALLBACK value
+)
+{
+    context = aContext;
+    specialPathHandler = value;
 }
 
 #define PATH_COUNT 6
@@ -67,7 +80,7 @@ typedef enum
 
 } RequestType;
 
-const char *paths[PATH_COUNT] = {
+static const char *paths[PATH_COUNT] = {
 	"/raw",
 	"/t",
 	"/raw-count",
@@ -231,7 +244,7 @@ const char *requestTypeString(RequestType value)
 void *uri_logger_callback (void *cls, const char *uri)
 {
 	if (logCB)
-		logCB(cls, LOG_INFO, 0, 0, uri);
+		logCB(cls, LOG_INFO, MODULE_WS, 0, uri);
 	return NULL;
 }
 
@@ -314,25 +327,24 @@ static MHD_Result processFile(struct MHD_Connection *connection, const std::stri
 	if (stat(fn, &buf) == 0)
 		file = fopen(fn, "rb");
 	else
-		file = NULL;
-	if (file == NULL) {
+		file = nullptr;
+	if (file == nullptr) {
 		if (logCB)
 			logCB(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(fn));
 
 		response = MHD_create_response_from_buffer(strlen(MSG404), (void *) MSG404, MHD_RESPMEM_PERSISTENT);
-		ret = MHD_queue_response (connection, MHD_HTTP_NOT_FOUND, response);
+		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
 		MHD_destroy_response (response);
 	} else {
 		response = MHD_create_response_from_callback(buf.st_size, 32 * 1024,
 			&file_reader_callback, file, &free_file_reader_callback);
-		if (NULL == response)
-		{
+		if (nullptr == response) {
 			fclose (file);
 			return MHD_NO;
 		}
 
 		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, mimeTypeByFileExtention(filename));
-		ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+		ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 		MHD_destroy_response(response);
 	}
 	return ret;
@@ -610,8 +622,18 @@ static MHD_Result request_callback(
 	requestenv->request.requestType = parseRequestType(url);
 
 	if (requestenv->request.requestType == RT_UNKNOWN) {
-			std::string fn = buildFileName(requestenv->config->dirRoot, url);
-			return processFile(connection, fn);
+        // try load from the file system
+        std::string fn = buildFileName(requestenv->config->dirRoot, url);
+        MHD_Result fr = processFile(connection, fn);
+        if (fr == MHD_YES)
+            return fr;
+        // if file not found, try load fom the host handler callback
+        if (requestenv->config->onSpecialPathHandler)
+            fr = requestenv->config->onSpecialPathHandler(context, requestenv->config, MODULE_WS,
+                url, method, version, upload_data, upload_data_size) ? MHD_YES : MHD_NO;
+        else
+            fr = MHD_NO;
+        return fr;
 	}
 
 	int r = (int) startFetchDb(connection, requestenv);
@@ -650,6 +672,7 @@ bool startWS(
 		MHD_OPTION_END
 	);
 	config.descriptor = (void *) d;
+    setSpecialPathHandler(config.specialPathHandler, config.onSpecialPathHandler);
 	setLogCallback(config.onLog);
 	if (logCB) {
 		if (config.descriptor) {

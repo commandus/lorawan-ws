@@ -17,14 +17,48 @@
 
 typedef std::map<std::string, DatabaseIntf*> MAP_NAME_DATABASE;
 
+/**
+ * Log callback function prototype
+ * @param env WSConfig
+ * @param level 0- error, 1- warning,..
+ * @param modulecode always 200
+ * @param errorcode 0- no error (warning, info)
+ * @param message optional error description
+ */
 typedef std::function<void(
-		void *env,
-		int level,
-		int modulecode,
-		int errorcode,
-		const std::string &message)> LOG_CALLBACK;
+    void *env,
+    int level,
+    int modulecode,
+    int errorcode,
+    const std::string &message
+)> LOG_CALLBACK;
 
+/**
+ * Special path handler provided by host
+ * @param level 0- error, 1- warning,..
+ * @param modulecode always 200
+ * @param url HTTP request URL
+ * @param method HTTP request method e.g. "GET"
+ * @param version HTTP request version e.g. "1.0"
+ * @param upload_data HTTP request uploaded data
+ * @param upload_data_size HTTP request uploaded data size, bytes
+ * @return true- OK
+  */
+typedef std::function<bool(
+    void* context,
+    void *env,
+    int modulecode,
+    // copy following parameters from the web request
+    const char *url,
+    const char *method,
+    const char *version,
+    const char *upload_data,
+    size_t *upload_data_size
+)> SPECIAL_PATH_HANDLER_CALLBACK;
 
+/**
+ * Configuration to start up web service
+ */
 typedef struct {
 	unsigned int threadCount;
 	unsigned int connectionLimit;
@@ -44,9 +78,15 @@ typedef struct {
 	MAP_NAME_DATABASE databases;
 
 	LOG_CALLBACK onLog;
+    void *specialPathHandler; ///< class instance
+    SPECIAL_PATH_HANDLER_CALLBACK onSpecialPathHandler;
 } WSConfig;
 
 void setLogCallback(LOG_CALLBACK value);
+void setSpecialPathHandler(
+    void *context,
+    SPECIAL_PATH_HANDLER_CALLBACK value
+);
 
 /**
  * @param threadCount threads count, e.g. 2
