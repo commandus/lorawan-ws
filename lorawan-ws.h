@@ -35,7 +35,9 @@ typedef std::function<void(
 
 /**
  * Special path handler provided by host
- * @param level 0- error, 1- warning,..
+ * @param content return value
+ * @param contentType, return content type. By default "text/javascript;charset=UTF-8"
+ * @param env config
  * @param modulecode always 200
  * @param url HTTP request URL
  * @param method HTTP request method e.g. "GET"
@@ -47,6 +49,8 @@ typedef std::function<void(
 class SPECIAL_PATH_HANDLER {
 public:
     virtual bool handle(
+        std::string &content,
+        std::string &contentType,
         void *env,
         int modulecode,
         // copy following parameters from the web request

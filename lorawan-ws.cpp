@@ -619,17 +619,26 @@ static MHD_Result request_callback(
 	requestenv->request.requestType = parseRequestType(url);
 
 	if (requestenv->request.requestType == RT_UNKNOWN) {
+        // if file not found, try load fom the host handler callback
+        MHD_Result fr;
+        if (requestenv->config->onSpecialPathHandler) {
+            std::string js;
+            std::string ct;
+            struct MHD_Response *specResponse;
+            fr = requestenv->config->onSpecialPathHandler->handle(js, ct, requestenv->config, MODULE_WS,
+                                                                  url, method, version, upload_data, upload_data_size) ? MHD_YES : MHD_NO;
+            if (ct.empty())
+                ct = CT_JSON;
+            specResponse = MHD_create_response_from_buffer(js.size(), (void *) js.c_str(), MHD_RESPMEM_PERSISTENT);
+            MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
+            fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
+            MHD_destroy_response(specResponse);
+            return fr;
+        }
+
         // try load from the file system
         std::string fn = buildFileName(requestenv->config->dirRoot, url);
-        MHD_Result fr = processFile(connection, fn);
-        if (fr == MHD_YES)
-            return fr;
-        // if file not found, try load fom the host handler callback
-        if (requestenv->config->onSpecialPathHandler)
-            fr = requestenv->config->onSpecialPathHandler->handle(requestenv->config, MODULE_WS,
-                url, method, version, upload_data, upload_data_size) ? MHD_YES : MHD_NO;
-        else
-            fr = MHD_NO;
+        fr = processFile(connection, fn);
         return fr;
 	}
 
