@@ -625,15 +625,17 @@ static MHD_Result request_callback(
             std::string js;
             std::string ct;
             struct MHD_Response *specResponse;
-            fr = requestenv->config->onSpecialPathHandler->handle(js, ct, requestenv->config, MODULE_WS,
-                                                                  url, method, version, upload_data, upload_data_size) ? MHD_YES : MHD_NO;
-            if (ct.empty())
-                ct = CT_JSON;
-            specResponse = MHD_create_response_from_buffer(js.size(), (void *) js.c_str(), MHD_RESPMEM_PERSISTENT);
-            MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
-            fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
-            MHD_destroy_response(specResponse);
-            return fr;
+            bool processed = requestenv->config->onSpecialPathHandler->handle(js, ct, requestenv->config, MODULE_WS,
+                url, method, version, upload_data, upload_data_size);
+            if (processed) {
+                if (ct.empty())
+                    ct = CT_JSON;
+                specResponse = MHD_create_response_from_buffer(js.size(), (void *) js.c_str(), MHD_RESPMEM_PERSISTENT);
+                MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
+                fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
+                MHD_destroy_response(specResponse);
+                return fr;
+            }
         }
 
         // try load from the file system
