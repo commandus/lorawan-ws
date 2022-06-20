@@ -44,17 +44,19 @@ typedef std::function<void(
  * @param upload_data_size HTTP request uploaded data size, bytes
  * @return true- OK
   */
-typedef std::function<bool(
-    void* context,
-    void *env,
-    int modulecode,
-    // copy following parameters from the web request
-    const char *url,
-    const char *method,
-    const char *version,
-    const char *upload_data,
-    size_t *upload_data_size
-)> SPECIAL_PATH_HANDLER_CALLBACK;
+class SPECIAL_PATH_HANDLER {
+public:
+    virtual bool handle(
+        void *env,
+        int modulecode,
+        // copy following parameters from the web request
+        const char *url,
+        const char *method,
+        const char *version,
+        const char *upload_data,
+        size_t *upload_data_size
+    ) = 0;
+};
 
 /**
  * Configuration to start up web service
@@ -78,15 +80,11 @@ typedef struct {
 	MAP_NAME_DATABASE databases;
 
 	LOG_CALLBACK onLog;
-    void *specialPathHandler; ///< class instance
-    SPECIAL_PATH_HANDLER_CALLBACK onSpecialPathHandler;
+    SPECIAL_PATH_HANDLER *onSpecialPathHandler;
 } WSConfig;
 
 void setLogCallback(LOG_CALLBACK value);
-void setSpecialPathHandler(
-    void *context,
-    SPECIAL_PATH_HANDLER_CALLBACK value
-);
+void setSpecialPathHandler(SPECIAL_PATH_HANDLER *value);
 
 /**
  * @param threadCount threads count, e.g. 2
