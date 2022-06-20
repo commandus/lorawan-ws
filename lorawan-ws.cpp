@@ -46,9 +46,8 @@
 
 #include "lorawan-ws.h"
 
-static void *context = nullptr;
 static LOG_CALLBACK logCB = nullptr;
-static SPECIAL_PATH_HANDLER_CALLBACK specialPathHandler = nullptr;
+static SPECIAL_PATH_HANDLER *specialPathHandler = nullptr;
 
 void setLogCallback(
     LOG_CALLBACK value
@@ -58,11 +57,9 @@ void setLogCallback(
 }
 
 void setSpecialPathHandler(
-    void *aContext,
-    SPECIAL_PATH_HANDLER_CALLBACK value
+    SPECIAL_PATH_HANDLER *value
 )
 {
-    context = aContext;
     specialPathHandler = value;
 }
 
@@ -629,7 +626,7 @@ static MHD_Result request_callback(
             return fr;
         // if file not found, try load fom the host handler callback
         if (requestenv->config->onSpecialPathHandler)
-            fr = requestenv->config->onSpecialPathHandler(context, requestenv->config, MODULE_WS,
+            fr = requestenv->config->onSpecialPathHandler->handle(requestenv->config, MODULE_WS,
                 url, method, version, upload_data, upload_data_size) ? MHD_YES : MHD_NO;
         else
             fr = MHD_NO;
@@ -672,7 +669,7 @@ bool startWS(
 		MHD_OPTION_END
 	);
 	config.descriptor = (void *) d;
-    setSpecialPathHandler(config.specialPathHandler, config.onSpecialPathHandler);
+    setSpecialPathHandler(config.onSpecialPathHandler);
 	setLogCallback(config.onLog);
 	if (logCB) {
 		if (config.descriptor) {
