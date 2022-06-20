@@ -19,6 +19,8 @@ set(WS_SQLITE_SOURCES
 	ws-sqlite.cpp lorawan-ws.cpp
 	third_party/argtable3/argtable3.c
 	third_party/daemonize/daemonize.cpp
+	db-helper.cpp
+	third_party/lorawan-network-server/db-sqlite.cpp
 )
 
 set(LIB_LORAWAN_WS_SRC
