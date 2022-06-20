@@ -9,7 +9,7 @@ nobase_dist_include_HEADERS = \
 	platform.h lorawan-ws.h db-helper.h \
 	third_party/argtable3/argtable3.h \
 	third_party/daemonize/daemonize.h \
-	third_party/lorawan-network-server/db-intf.h \
+	third_party/db-intf.h \
 	third_party/lorawan-network-server/db-sqlite.h
 	
 LIB_WS_SQLITE_SRC = \

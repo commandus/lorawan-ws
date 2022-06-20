@@ -1,8 +1,8 @@
 #ifndef DB_INTF_H
 #define DB_INTF_H	1
 
-#include <string>
-#include <vector>
+#include <c++/5/string>
+#include <c++/5/vector>
 
 typedef enum {
 	DBT_INTEGER = 1,

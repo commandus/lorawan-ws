@@ -11,11 +11,11 @@
 #include <iostream>
 #include <fstream>
 
-#include "lorawan-network-server/db-intf.h"
-
-#define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
+#include "db-intf.h"
 
 typedef std::map<std::string, DatabaseIntf*> MAP_NAME_DATABASE;
+
+#define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
 
 /**
  * Log callback function prototype
