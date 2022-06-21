@@ -46,7 +46,7 @@ typedef std::function<void(
  * @param upload_data_size HTTP request uploaded data size, bytes
  * @return true- OK
   */
-class SPECIAL_PATH_HANDLER {
+class WebServiceRequestHandler {
 public:
     virtual bool handle(
         std::string &content,
@@ -84,11 +84,11 @@ typedef struct {
 	MAP_NAME_DATABASE databases;
 
 	LOG_CALLBACK onLog;
-    SPECIAL_PATH_HANDLER *onSpecialPathHandler;
+    WebServiceRequestHandler *onSpecialPathHandler;
 } WSConfig;
 
 void setLogCallback(LOG_CALLBACK value);
-void setSpecialPathHandler(SPECIAL_PATH_HANDLER *value);
+void setSpecialPathHandler(WebServiceRequestHandler *value);
 
 /**
  * @param threadCount threads count, e.g. 2
