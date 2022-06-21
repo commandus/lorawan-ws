@@ -47,7 +47,7 @@
 #include "lorawan-ws.h"
 
 static LOG_CALLBACK logCB = nullptr;
-static SPECIAL_PATH_HANDLER *specialPathHandler = nullptr;
+static WebServiceRequestHandler *specialPathHandler = nullptr;
 
 void setLogCallback(
     LOG_CALLBACK value
@@ -57,7 +57,7 @@ void setLogCallback(
 }
 
 void setSpecialPathHandler(
-    SPECIAL_PATH_HANDLER *value
+        WebServiceRequestHandler *value
 )
 {
     specialPathHandler = value;
@@ -312,7 +312,10 @@ static const char *mimeTypeByFileExtention(const std::string &filename)
 
 }
 
-static MHD_Result processFile(struct MHD_Connection *connection, const std::string &filename)
+static MHD_Result processFile(
+    struct MHD_Connection *connection,
+    const std::string &filename
+)
 {
 	struct MHD_Response *response;
 	MHD_Result ret;
@@ -622,15 +625,15 @@ static MHD_Result request_callback(
         // if file not found, try load fom the host handler callback
         MHD_Result fr;
         if (requestenv->config->onSpecialPathHandler) {
-            std::string js;
+            std::string content;
             std::string ct;
             struct MHD_Response *specResponse;
-            bool processed = requestenv->config->onSpecialPathHandler->handle(js, ct, requestenv->config, MODULE_WS,
+            bool processed = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config, MODULE_WS,
                 url, method, version, upload_data, upload_data_size);
             if (processed) {
                 if (ct.empty())
                     ct = CT_JSON;
-                specResponse = MHD_create_response_from_buffer(js.size(), (void *) js.c_str(), MHD_RESPMEM_PERSISTENT);
+                specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(), MHD_RESPMEM_MUST_COPY);
                 MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
                 fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
                 MHD_destroy_response(specResponse);

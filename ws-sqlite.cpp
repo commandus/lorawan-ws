@@ -64,6 +64,30 @@ static void onLogFile(
 		*logFileStrm << errorcode << "\t" << message << std::endl;
 }
 
+class WsDumbRequestHandler : public WebServiceRequestHandler {
+    bool handle(
+            std::string &content,
+            std::string &contentType,
+            void *env,
+            int modulecode,
+            // copy following parameters from the web request
+            const char *url,
+            const char *method,
+            const char *version,
+            const char *upload_data,
+            size_t *upload_data_size
+    ) override
+    {
+        std::string p(url);
+        if (p == "/about") {
+            content = "<html><body><h1>lorawan-ws</h1><a href=\"https://github.com/commandus/lorawan-ws\">GitHub</a></body></html>";
+            contentType = "text/html;charset=UTF-8";
+            return true;
+        }
+        return false;
+    }
+};
+
 /**
  * Parse command line into struct ggdbsvcConfig
  * Return 0- success
@@ -226,8 +250,12 @@ int main(int argc, char* argv[])
 	if (r)
 		exit(r);
 
+    // web service special path
+    WsDumbRequestHandler dumbPathHandler;
+    config.onSpecialPathHandler = &dumbPathHandler;
 
-	dbSqlite.open(dbFileName, "", "", "", 0);
+
+    dbSqlite.open(dbFileName, "", "", "", 0);
 	config.databases[""] = &dbSqlite;
 	config.databases["sqlite"] = &dbSqlite;
 
