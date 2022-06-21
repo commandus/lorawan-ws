@@ -88,7 +88,6 @@ typedef struct {
 } WSConfig;
 
 void setLogCallback(LOG_CALLBACK value);
-void setSpecialPathHandler(WebServiceRequestHandler *value);
 
 /**
  * @param threadCount threads count, e.g. 2

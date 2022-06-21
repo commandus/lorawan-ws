@@ -47,20 +47,12 @@
 #include "lorawan-ws.h"
 
 static LOG_CALLBACK logCB = nullptr;
-static WebServiceRequestHandler *specialPathHandler = nullptr;
 
 void setLogCallback(
     LOG_CALLBACK value
 )
 {
 	logCB = value;
-}
-
-void setSpecialPathHandler(
-        WebServiceRequestHandler *value
-)
-{
-    specialPathHandler = value;
 }
 
 #define PATH_COUNT 6
@@ -683,7 +675,6 @@ bool startWS(
 		MHD_OPTION_END
 	);
 	config.descriptor = (void *) d;
-    setSpecialPathHandler(config.onSpecialPathHandler);
 	setLogCallback(config.onLog);
 	if (logCB) {
 		if (config.descriptor) {

@@ -254,7 +254,6 @@ int main(int argc, char* argv[])
     WsDumbRequestHandler dumbPathHandler;
     config.onSpecialPathHandler = &dumbPathHandler;
 
-
     dbSqlite.open(dbFileName, "", "", "", 0);
 	config.databases[""] = &dbSqlite;
 	config.databases["sqlite"] = &dbSqlite;
