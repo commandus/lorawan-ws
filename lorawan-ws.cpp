@@ -569,6 +569,14 @@ static DatabaseIntf *findDatabaseByName(
 		return it->second;
 }
 
+static void addCORS(MHD_Response *response) {
+    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS_ORIGIN);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, HDR_CORS_CREDENTIALS);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, HDR_CORS_METHODS);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, HDR_CORS_HEADERS);
+}
+
 static MHD_Result request_callback(
 	void *cls,			// struct WSConfig*
 	struct MHD_Connection *connection,
@@ -626,6 +634,7 @@ static MHD_Result request_callback(
                 if (ct.empty())
                     ct = CT_JSON;
                 specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(), MHD_RESPMEM_MUST_COPY);
+                addCORS(specResponse);
                 MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
                 fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
                 MHD_destroy_response(specResponse);
@@ -648,12 +657,8 @@ static MHD_Result request_callback(
 		hc = MHD_HTTP_OK;
 		response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv, &chunk_done_callback);
 	}
-	MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
-	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS_ORIGIN);
-	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, HDR_CORS_CREDENTIALS);
-	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, HDR_CORS_METHODS);
-	MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, HDR_CORS_HEADERS);
-	
+    addCORS(response);
+
 	ret = MHD_queue_response(connection, hc, response);
 	MHD_destroy_response(response);
 	return ret;
