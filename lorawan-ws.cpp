@@ -426,12 +426,6 @@ static START_FETCH_DB_RESULT startFetchDb(
 			logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
 		}
 		return START_FETCH_DB_PREPARE_FAILED;
-	} else {
-        if(env->config->verbosity > 0) {
-            std::stringstream ss;
-            ss << " SQL " << pathSelect.c_str();
-            logCB(env, LOG_INFO, MODULE_WS, r, ss.str());
-        }
     }
 
 	// bind required params
