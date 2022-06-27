@@ -71,14 +71,15 @@ class WsDumbRequestHandler : public WebServiceRequestHandler {
             void *env,
             int modulecode,
             // copy following parameters from the web request
-            const char *url,
+            const char *path,
             const char *method,
             const char *version,
+            std::map<std::string, std::string> &params,
             const char *upload_data,
             size_t *upload_data_size
     ) override
     {
-        std::string p(url);
+        std::string p(path);
         if (p == "/about") {
             content = "<html><body><h1>lorawan-ws</h1><a href=\"https://github.com/commandus/lorawan-ws\">GitHub</a></body></html>";
             contentType = "text/html;charset=UTF-8";

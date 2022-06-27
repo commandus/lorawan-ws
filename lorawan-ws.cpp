@@ -12,6 +12,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <map>
 
 #include "platform.h"
 
@@ -571,6 +572,18 @@ static void addCORS(MHD_Response *response) {
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, HDR_CORS_HEADERS);
 }
 
+static  enum MHD_Result putStringVector(
+    void *retVal,
+    enum MHD_ValueKind kind,
+    const char *key,
+    const char *value
+)
+{
+    std::map<std::string, std::string> *r = (std::map<std::string, std::string> *) retVal;
+    r->insert(std::pair<std::string, std::string>(key, value));
+    return MHD_YES;
+}
+
 static MHD_Result request_callback(
 	void *cls,			// struct WSConfig*
 	struct MHD_Connection *connection,
@@ -622,8 +635,11 @@ static MHD_Result request_callback(
             std::string content;
             std::string ct;
             struct MHD_Response *specResponse;
+
+            std::map<std::string, std::string> q;
+            MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, putStringVector, &q);
             bool processed = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config, MODULE_WS,
-                url, method, version, upload_data, upload_data_size);
+                url, method, version, q, upload_data, upload_data_size);
             if (processed) {
                 if (ct.empty())
                     ct = CT_JSON;
