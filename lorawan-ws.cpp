@@ -572,7 +572,7 @@ static void addCORS(MHD_Response *response) {
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, HDR_CORS_HEADERS);
 }
 
-static  enum MHD_Result putStringVector(
+static MHD_Result putStringVector(
     void *retVal,
     enum MHD_ValueKind kind,
     const char *key,
