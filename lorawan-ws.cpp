@@ -565,7 +565,6 @@ static DatabaseIntf *findDatabaseByName(
 }
 
 static void addCORS(MHD_Response *response) {
-    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, HDR_CORS_ORIGIN);
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, HDR_CORS_CREDENTIALS);
     MHD_add_response_header(response, MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, HDR_CORS_METHODS);
@@ -605,15 +604,12 @@ static MHD_Result request_callback(
 		return MHD_YES;
 	}
 
-	if (strcmp(method, "PUT") == 0)
-		return MHD_NO;              // not implemented
-	if (strcmp(method, "DELETE") == 0)
-		return MHD_NO;              // not implemented
-	// GET POST HEAD CONNECT OPTIONS TRACE PATCH
-		
-	*ptr = NULL;					// reset when done
+    if (strcmp(method, "OPTIONS") == 0)
+		return MHD_NO;              // do not process
 
-	RequestEnv *requestenv = (RequestEnv *) malloc(sizeof(RequestEnv));
+    *ptr = nullptr;					// reset when done
+
+    RequestEnv *requestenv = (RequestEnv *) malloc(sizeof(RequestEnv));
 	requestenv->state.state = 0;
 	requestenv->config = (WSConfig*) cls;
 	requestenv->db = findDatabaseByName(connection, requestenv->config->databases);
@@ -667,6 +663,7 @@ static MHD_Result request_callback(
 		hc = MHD_HTTP_OK;
 		response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv, &chunk_done_callback);
 	}
+    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
     addCORS(response);
 
 	ret = MHD_queue_response(connection, hc, response);
