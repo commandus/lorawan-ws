@@ -181,7 +181,7 @@ typedef enum {
 } START_FETCH_DB_RESULT;
 
 const static char *MSG500[5] = {
-	"200 OK",
+	"",
 	"Database connection not established",
 	"SQL statement preparation failed",
 	"Required parameter missed",
@@ -604,8 +604,14 @@ static MHD_Result request_callback(
 		return MHD_YES;
 	}
 
-    if (strcmp(method, "OPTIONS") == 0)
-		return MHD_NO;              // do not process
+    if (strcmp(method, "OPTIONS") == 0) {
+        response = MHD_create_response_from_buffer(strlen(MSG500[0]), (void *) MSG500[0], MHD_RESPMEM_PERSISTENT);
+        MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
+        addCORS(response);
+        ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+        MHD_destroy_response(response);
+        return MHD_YES;
+    }
 
     *ptr = nullptr;					// reset when done
 
