@@ -158,6 +158,7 @@ const int pathRequiredParams[PATH_COUNT][QUERY_PARAMS_REQUIRED_MAX] = {
 };
 
 const static char *MSG404 = "404 not found";
+const static char *CE_GZIP = "gzip";
 const static char *CT_HTML = "text/html;charset=UTF-8";
 const static char *CT_JSON = "text/javascript;charset=UTF-8";
 const static char *CT_KML = "application/vnd.google-earth.kml+xml";
@@ -268,9 +269,9 @@ static void free_file_reader_callback(void *cls)
 	fclose ((FILE *) cls);
 }
 
-static const char *mimeTypeByFileExtention(const std::string &filename)
+static const char *mimeTypeByFileExtension(const std::string &filename)
 {
-	std::string ext = filename.substr(filename.find_last_of(".") + 1);
+	std::string ext = filename.substr(filename.find_last_of('.') + 1);
 	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 	if (ext == "html")
 		return CT_HTML;
@@ -302,7 +303,6 @@ static const char *mimeTypeByFileExtention(const std::string &filename)
 			return CT_TTF;
 	else
 		return CT_BIN;
-
 }
 
 static MHD_Result processFile(
@@ -315,15 +315,23 @@ static MHD_Result processFile(
 	FILE *file;
 	struct stat buf;
 
-	const char *fn = filename.c_str();
-
-	if (stat(fn, &buf) == 0)
-		file = fopen(fn, "rb");
-	else
-		file = nullptr;
+	const char *localFileName = filename.c_str();
+    bool gzipped = false;
+	if (stat(localFileName, &buf) == 0)
+		file = fopen(localFileName, "rb");
+	else {
+        std::string fnGzip(filename);
+        fnGzip += ".gz";
+        localFileName = fnGzip.c_str();
+        if (stat(localFileName, &buf) == 0) {
+            file = fopen(localFileName, "rb");
+            gzipped = true;
+        } else
+            file = nullptr;
+    }
 	if (file == nullptr) {
 		if (logCB)
-			logCB(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(fn));
+			logCB(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(localFileName));
 
 		response = MHD_create_response_from_buffer(strlen(MSG404), (void *) MSG404, MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
@@ -336,7 +344,9 @@ static MHD_Result processFile(
 			return MHD_NO;
 		}
 
-		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, mimeTypeByFileExtention(filename));
+		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, mimeTypeByFileExtension(filename));
+        if (gzipped)
+            MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_ENCODING, CE_GZIP);
 		ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 		MHD_destroy_response(response);
 	}
