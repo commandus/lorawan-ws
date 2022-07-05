@@ -30,5 +30,13 @@ AC_CHECK_FUNCS([memmove memset])
 
 CXXFLAGS='-Wall -std=c++11'
 
-AC_OUTPUT
+AC_ARG_ENABLE([jwt],
+[  --enable-jwt    Turn on JWT authorization],
+[case "${enableval}" in
+  yes) jwt=true ;;
+  no)  jwt=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-jwt]) ;;
+esac],[jwt=false])
+AM_CONDITIONAL([ENABLE_JWT], [test x$jwt = xtrue])
 
+AC_OUTPUT

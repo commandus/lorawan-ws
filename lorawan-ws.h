@@ -86,6 +86,12 @@ typedef struct {
 
 	LOG_CALLBACK onLog;
     WebServiceRequestHandler *onSpecialPathHandler;
+
+    // Authorization
+    void *jwt;
+    std::string realm;
+    std::string issuer;
+    std::string secret;
 } WSConfig;
 
 void setLogCallback(LOG_CALLBACK value);

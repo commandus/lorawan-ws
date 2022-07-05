@@ -154,11 +154,34 @@ kosa-ge=11&kosa-le=22
 
 ## Сборка
 
+Сборка с авторизацией по JWT токену
+
+```
+./autogen.sh
+./configure --enable-jwt
+make
+```
+
 Необходимые зависимости:
 
 - libmicrohttpd-0.9.43 (http://ftp.gnu.org/gnu/libmicrohttpd/)
 - sqlite3
 
+
+
+Если включен enable-jwt:
+
+- [jwt-cpp](https://github.com/Thalhammer/jwt-cpp) [репозиторий](https://github.com/Thalhammer/jwt-cpp.git)
+- [PicoJSON](https://github.com/kazuho/picojson) [репозиторий](https://github.com/kazuho/picojson.git)
+
+Эти header-only библиотеки находятся в папке third_party. 
+
+Для jwt-cpp требуется установка одной из библиотек SSL:
+
+- [OpenSSL](https://www.openssl.org/)
+- LibreSSL
+- wolfSSL
+ 
 ### Linux
 
 Установите зависимости:
