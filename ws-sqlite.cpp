@@ -19,6 +19,10 @@
 
 #include "daemonize/daemonize.h"
 
+#ifdef ENABLE_JWT
+#include "auth-jwt.h"
+#endif
+
 const char *progname = "ws-sqlite";
 
 /**
@@ -41,7 +45,7 @@ const char *progname = "ws-sqlite";
 
 static WSConfig config;
 static DatabaseSQLite dbSqlite;
-static std::ofstream *logFileStrm = NULL;
+static std::ofstream *logFileStrm = nullptr;
 
 std::string getPathFirstFragments(const std::string &value)
 {
@@ -109,8 +113,13 @@ int parseCmd
 	struct arg_str *a_dirroot = arg_str0("r", "root", "<path>", "web root path. Default './html'");
 	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
-	struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force create table in database");
-	struct arg_lit *a_daemonize = arg_lit0(NULL, "daemonize", "run daemon");
+#ifdef ENABLE_JWT
+    struct arg_str *a_realm = arg_str0(nullptr, "realm", "<Auth-realm>", "Authorization realm");
+    struct arg_str *a_issuer = arg_str0(nullptr, "issuer", "<JWT-realm>", "JWT issuer name");
+    struct arg_str *a_secret = arg_str0(nullptr, "secret", "<JWT-secret>", "JWT secret");
+#endif
+    struct arg_lit *a_create_table = arg_lit0("c", "create-table", "force create table in database");
+	struct arg_lit *a_daemonize = arg_lit0(nullptr, "daemonize", "run daemon");
 	struct arg_lit *a_verbosity = arg_litn("v", "verbosity", 0, 4, "v- error, vv- warning, vvv, vvvv- debug");
 	struct arg_file *a_logfile = arg_file0("l", "log", "<file>", "log file");
 	
@@ -118,7 +127,10 @@ int parseCmd
 	struct arg_end *a_end = arg_end(20);
 
 	void* argtable[] = { a_listenport, a_dirroot, a_database, a_logfile,
-		a_create_table, a_daemonize,
+#ifdef ENABLE_JWT
+        a_realm, a_issuer, a_secret,
+#endif
+        a_create_table, a_daemonize,
 		a_verbosity, a_help, a_end
 	};
 
@@ -161,6 +173,12 @@ int parseCmd
 	retval->flags = MHD_START_FLAGS;
 	retval->onLog = onLogFile;
 
+#ifdef ENABLE_JWT
+    retval->realm = *a_realm->sval;
+    retval->issuer = *a_issuer->sval;
+    retval->secret = *a_secret->sval;
+#endif
+
 	if (a_logfile->count)
 	{
 		logFileStrm = new std::ofstream(*a_logfile->filename);
@@ -194,13 +212,13 @@ static void done()
 	dbSqlite.close();
 	if (logFileStrm) {
 		delete logFileStrm;
-		logFileStrm = NULL;
+		logFileStrm = nullptr;
 	}
 }
 
 static void start()
 {
-	if (!startWS(config)) {
+    if (!startWS(config)) {
 		std::cerr << "Can not start web service errno " 
 			<< errno << ": " << strerror(errno) << std::endl;
 			std::cerr << "libmicrohttpd version " << std::hex << MHD_VERSION << std::endl;
@@ -231,7 +249,7 @@ void setSignalHandler(int signal)
 	struct sigaction action;
 	memset(&action, 0, sizeof(struct sigaction));
 	action.sa_handler = &signalHandler;
-	sigaction(signal, &action, NULL);
+	sigaction(signal, &action, nullptr);
 #endif
 }
 
@@ -259,7 +277,7 @@ int main(int argc, char* argv[])
 	config.databases[""] = &dbSqlite;
 	config.databases["sqlite"] = &dbSqlite;
 
-	if (daemonize) {
+    if (daemonize) {
 		char wd[PATH_MAX];
 		std::string progpath = getcwd(wd, PATH_MAX);
 		Daemonize daemonize(progname, progpath, start, stop, done);

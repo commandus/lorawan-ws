@@ -47,6 +47,10 @@
 
 #include "lorawan-ws.h"
 
+#ifdef ENABLE_JWT
+#include "auth-jwt.h"
+#endif
+
 static LOG_CALLBACK logCB = nullptr;
 
 void setLogCallback(
@@ -181,12 +185,13 @@ typedef enum {
 	START_FETCH_DB_BIND_PARAM = 4
 } START_FETCH_DB_RESULT;
 
-const static char *MSG500[5] = {
-	"",
-	"Database connection not established",
-	"SQL statement preparation failed",
-	"Required parameter missed",
-	"Binding parameter failed"
+const static char *MSG500[6] = {
+	"",                                     // 0
+	"Database connection not established",  // 1
+	"SQL statement preparation failed",     // 2
+	"Required parameter missed",            // 3
+	"Binding parameter failed"              // 4
+    "Unauthorized"                          // 5
 };
 
 typedef struct 
@@ -670,6 +675,37 @@ static MHD_Result request_callback(
         return fr;
 	}
 
+#ifdef ENABLE_JWT
+    AuthJWT *aj = (AuthJWT *) ((WSConfig*) cls)->jwt;
+    if (aj) {
+        if (!aj->issuer.empty()) {
+            // Verify JWT token by "Authorization: Bearer ..." header
+            std::string jwt;
+            const char *bearer = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_AUTHORIZATION);
+            if (bearer) {
+                jwt = bearer;
+                size_t p = jwt.find("Bearer");
+                if (p != std::string::npos) {
+                    jwt = jwt.substr(p + 6);
+                    // left trim
+                    jwt.erase(jwt.begin(), std::find_if(jwt.begin(), jwt.end(), [](unsigned char ch) {
+                        return !std::isspace(ch);
+                    }));
+                }
+            }
+            if (!aj->verify(jwt)) {
+                int hc = MHD_HTTP_UNAUTHORIZED;
+                response = MHD_create_response_from_buffer(strlen(MSG500[5]), (void *) MSG500[5], MHD_RESPMEM_PERSISTENT);
+                std::string hwa = "Bearer realm=\"";
+                hwa += aj->realm + "\" error=\"invalid_token\"";
+                MHD_add_response_header(response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, hwa.c_str());
+                ret = MHD_queue_response(connection, hc, response);
+                MHD_destroy_response(response);
+            }
+        }
+    }
+#endif
+
 	int r = (int) startFetchDb(connection, requestenv);
 	int hc;
 	if (r) {
@@ -714,6 +750,11 @@ bool startWS(
 			logCB(&config, LOG_ERR, MODULE_WS, errno, ss.str());
 		}
 	}
+#ifdef ENABLE_JWT
+    config.jwt = new AuthJWT(config.realm, config.issuer, config.secret);
+#else
+    config.jwt = nullptr;
+#endif
 	return config.descriptor != NULL;
 }
 
@@ -727,4 +768,8 @@ void doneWS(
 		logCB(&config, LOG_INFO, MODULE_WS, 0, "web service stopped");
 	}
 	config.descriptor = NULL;
+#ifdef ENABLE_JWT
+    if (config.jwt)
+        delete (AuthJWT*) config.jwt;
+#endif
 }
