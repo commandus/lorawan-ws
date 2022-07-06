@@ -12,10 +12,8 @@ class AuthJWT {
 private:
     jwt::verifier<jwt::default_clock, jwt::traits::kazuho_picojson> *verifier;
 public:
-    std::string realm;
     std::string issuer;
-    std::string secret;
-    AuthJWT(const std::string &realm, const std::string &issuer, const std::string &secret);
+    AuthJWT(const std::string &issuer, const std::string &secret);
     virtual ~AuthJWT();
     bool verify(const std::string &token);
 };

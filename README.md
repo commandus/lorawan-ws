@@ -43,9 +43,31 @@ wget http://localhost:5002/t?o=0&s=10
 - -r, --root=<path>         web root path. Default './html'
 - -d, --database=<file>     SQLite database file name. Default ../lorawan-network-server/db/logger-huffman.db
 - -l, --log=<file>          log file
+- -i, --issuer=<JWT-realm>      JWT issuer name
+- -s, --secret=<JWT-secret>     JWT secret
 - -c, --create-table        force create table in database
 - -v, --verbosity           v- error, vv- warning, vvv, vvvv- debug
 - -h, --help                Show this help
+
+### Токен безопасности JWT
+
+Если задан параметр -i, --issuer, веб сервис будет авторизовать запрос по токену безопасности JWT 
+(при этом желательно задать пароль в опции -s, --secret).
+
+Если -i не хадан, веб сервис не проверяет запросы.
+
+Запросы должны передавать заголовок Authorization: Bearer <JWT>
+
+Токен безопасности JWT в клиенте создается в другом месте (например, вызовом onSpecialPathHandler->handle()) 
+алгоритмом HS256.
+
+Параметр --issuer задает имя выпустившего JavaScript web token, параметр --secret - назначенный им пароль.
+
+Эти два параметра нужны для проверки токена базопасности JWT на валидность.
+
+Если токен просрочен, или подпись неверна, веб сервис возвращвет ошибку 401 вместе с заголовком WWW-Authenticate.
+
+В таком случае клент должен сгененрировать новый токен безопасности и передать его в заголовке Authorization: Bearer <JWT>.
 
 ## Файлы
 

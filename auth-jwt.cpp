@@ -1,11 +1,10 @@
 #include "auth-jwt.h"
 
 AuthJWT::AuthJWT(
-    const std::string &aRealm,
     const std::string &aIssuer,
-    const std::string &aSecret
+    const std::string &secret
 )
-    : realm(aRealm), issuer(aIssuer), secret(aSecret)
+    : issuer(aIssuer)
 {
     *verifier = jwt::verify()
         .allow_algorithm(jwt::algorithm::hs256{ secret })

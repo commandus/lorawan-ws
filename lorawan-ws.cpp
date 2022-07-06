@@ -598,6 +598,19 @@ static MHD_Result putStringVector(
     return MHD_YES;
 }
 
+static MHD_Result httpError401(
+    struct MHD_Connection *connection
+)
+{
+    int hc = MHD_HTTP_UNAUTHORIZED;
+    struct MHD_Response *response = MHD_create_response_from_buffer(strlen(MSG500[5]), (void *) MSG500[5], MHD_RESPMEM_PERSISTENT);
+    std::string hwa = "Bearer error=\"invalid_token\"";
+    MHD_add_response_header(response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, hwa.c_str());
+    MHD_Result r = MHD_queue_response(connection, hc, response);
+    MHD_destroy_response(response);
+    return r;
+}
+
 static MHD_Result request_callback(
 	void *cls,			// struct WSConfig*
 	struct MHD_Connection *connection,
@@ -645,36 +658,7 @@ static MHD_Result request_callback(
 
 	requestenv->request.requestType = parseRequestType(url);
 
-	if (requestenv->request.requestType == RT_UNKNOWN) {
-        // if file not found, try load fom the host handler callback
-        MHD_Result fr;
-        if (requestenv->config->onSpecialPathHandler) {
-            std::string content;
-            std::string ct;
-            struct MHD_Response *specResponse;
-
-            std::map<std::string, std::string> q;
-            MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, putStringVector, &q);
-            bool processed = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config, MODULE_WS,
-                url, method, version, q, upload_data, upload_data_size);
-            if (processed) {
-                if (ct.empty())
-                    ct = CT_JSON;
-                specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(), MHD_RESPMEM_MUST_COPY);
-                addCORS(specResponse);
-                MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
-                fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
-                MHD_destroy_response(specResponse);
-                return fr;
-            }
-        }
-
-        // try load from the file system
-        std::string fn = buildFileName(requestenv->config->dirRoot, url);
-        fr = processFile(connection, fn);
-        return fr;
-	}
-
+    bool authorized = true;
 #ifdef ENABLE_JWT
     AuthJWT *aj = (AuthJWT *) ((WSConfig*) cls)->jwt;
     if (aj) {
@@ -693,20 +677,47 @@ static MHD_Result request_callback(
                     }));
                 }
             }
-            if (!aj->verify(jwt)) {
-                int hc = MHD_HTTP_UNAUTHORIZED;
-                response = MHD_create_response_from_buffer(strlen(MSG500[5]), (void *) MSG500[5], MHD_RESPMEM_PERSISTENT);
-                std::string hwa = "Bearer realm=\"";
-                hwa += aj->realm + "\" error=\"invalid_token\"";
-                MHD_add_response_header(response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, hwa.c_str());
-                ret = MHD_queue_response(connection, hc, response);
-                MHD_destroy_response(response);
-            }
+            authorized = aj->verify(jwt);
         }
     }
 #endif
+    if (requestenv->request.requestType == RT_UNKNOWN) {
+        // if JSON service not found, try load from the host handler callback, then from the file
+        MHD_Result fr;
+        if (requestenv->config->onSpecialPathHandler) {
+            std::string content;
+            std::string ct;
+            struct MHD_Response *specResponse;
 
-	int r = (int) startFetchDb(connection, requestenv);
+            std::map<std::string, std::string> q;
+            MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, putStringVector, &q);
+            bool processed = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
+                MODULE_WS, url, method, version, q, upload_data, upload_data_size, false);
+            if (processed) {
+                if (ct.empty())
+                    ct = CT_JSON;
+                specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(), MHD_RESPMEM_MUST_COPY);
+                addCORS(specResponse);
+                MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
+                fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
+                MHD_destroy_response(specResponse);
+                return fr;
+            } else {
+                if (!authorized)
+                    return httpError401(connection);
+            }
+        }
+
+        // try load from the file system
+        std::string fn = buildFileName(requestenv->config->dirRoot, url);
+        fr = processFile(connection, fn);
+        return fr;
+	}
+
+    if (!authorized)
+        return httpError401(connection);
+
+    int r = (int) startFetchDb(connection, requestenv);
 	int hc;
 	if (r) {
 		hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -751,7 +762,7 @@ bool startWS(
 		}
 	}
 #ifdef ENABLE_JWT
-    config.jwt = new AuthJWT(config.realm, config.issuer, config.secret);
+    config.jwt = new AuthJWT(config.issuer, config.secret);
 #else
     config.jwt = nullptr;
 #endif
