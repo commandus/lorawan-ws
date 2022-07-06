@@ -38,15 +38,16 @@ if(ENABLE_JWT)
 	set(EXTRA_DEF ENABLE_JWT)
 endif()
 
-add_executable(ws-sqlite ${WS_SQLITE_SOURCES})
-target_link_libraries(ws-sqlite PRIVATE Threads::Threads
+add_executable(wssqlite ${WS_SQLITE_SOURCES})
+target_link_libraries(wssqlite PRIVATE Threads::Threads
 	${DB_LIB} ${HTTPD_LIB} ${EXTRA_LIBS}
 )
-target_compile_definitions(ws-sqlite PUBLIC ${EXTRA_DEF})
+target_compile_definitions(wssqlite PUBLIC ${EXTRA_DEF})
 
-add_library(lorawan STATIC
+add_library(ws-sqlite STATIC
 	${LIB_LORAWAN_WS_SRC}
 )
+target_compile_definitions(ws-sqlite PUBLIC ${EXTRA_DEF})
 
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/ws-sqlite DESTINATION cmake)
 INSTALL(FILES README.md LICENSE HISTORY COPYING TODO CODE_OF_CONDUCT.md CONTRIBUTING.md DESTINATION doc)
