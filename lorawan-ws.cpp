@@ -161,7 +161,6 @@ const int pathRequiredParams[PATH_COUNT][QUERY_PARAMS_REQUIRED_MAX] = {
 	{ 2, EOP, 0 }
 };
 
-const static char *MSG404 = "404 not found";
 const static char *CE_GZIP = "gzip";
 const static char *CT_HTML = "text/html;charset=UTF-8";
 const static char *CT_JSON = "text/javascript;charset=UTF-8";
@@ -185,13 +184,15 @@ typedef enum {
 	START_FETCH_DB_BIND_PARAM = 4
 } START_FETCH_DB_RESULT;
 
-const static char *MSG500[6] = {
+const static char *MSG404 = "404 not found";
+const static char *MSG401 = "Unauthorized";
+
+const static char *MSG500[5] = {
 	"",                                     // 0
 	"Database connection not established",  // 1
 	"SQL statement preparation failed",     // 2
 	"Required parameter missed",            // 3
 	"Binding parameter failed"              // 4
-    "Unauthorized"                          // 5
 };
 
 typedef struct 
@@ -241,7 +242,7 @@ void *uri_logger_callback (void *cls, const char *uri)
 {
 	if (logCB)
 		logCB(cls, LOG_INFO, MODULE_WS, 0, uri);
-	return NULL;
+	return nullptr;
 }
 
 static int doneFetch(
@@ -256,7 +257,7 @@ static int doneFetch(
 			logCB(env, LOG_ERR, MODULE_WS, r, "Cursor close error " + env->db->errmsg);
 		return START_FETCH_DB_PREPARE_FAILED;
 	}
-	env->stmt = NULL;
+	env->stmt = nullptr;
 	return 0;
 }
 
@@ -558,7 +559,7 @@ static ssize_t chunk_callbackFetchDb(void *cls, uint64_t pos, char *buf, size_t 
 static void chunk_done_callback(void *cls)
 {
 	RequestEnv *e = (RequestEnv*) cls;
-	if (e != NULL)
+	if (e != nullptr)
 	{
 		doneFetch(e);
 		free(e);
@@ -574,7 +575,7 @@ static DatabaseIntf *findDatabaseByName(
 	std::string dbname = c ? c : "";
 	MAP_NAME_DATABASE::const_iterator it = databases.find(dbname);
 	if (it == databases.end())
-		return NULL;
+		return nullptr;
 	else
 		return it->second;
 }
@@ -603,7 +604,7 @@ static MHD_Result httpError401(
 )
 {
     int hc = MHD_HTTP_UNAUTHORIZED;
-    struct MHD_Response *response = MHD_create_response_from_buffer(strlen(MSG500[5]), (void *) MSG500[5], MHD_RESPMEM_PERSISTENT);
+    struct MHD_Response *response = MHD_create_response_from_buffer(strlen(MSG401), (void *) MSG401, MHD_RESPMEM_PERSISTENT);
     std::string hwa = "Bearer error=\"invalid_token\"";
     MHD_add_response_header(response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, hwa.c_str());
     MHD_Result r = MHD_queue_response(connection, hc, response);
@@ -676,8 +677,9 @@ static MHD_Result request_callback(
                         return !std::isspace(ch);
                     }));
                 }
-            }
-            authorized = aj->verify(jwt);
+                authorized = aj->verify(jwt);
+            } else
+                authorized = false;
         }
     }
 #endif
@@ -741,11 +743,11 @@ bool startWS(
 		config.flags = MHD_START_FLAGS;
 
 	struct MHD_Daemon *d = MHD_start_daemon(
-		config.flags, config.port, NULL, NULL, 
+		config.flags, config.port, nullptr, nullptr,
 		&request_callback, &config,
 		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
 		MHD_OPTION_THREAD_POOL_SIZE, config.threadCount,
-		MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, NULL,
+		MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, nullptr,
 		MHD_OPTION_CONNECTION_LIMIT, config.connectionLimit,
 		MHD_OPTION_END
 	);
@@ -766,19 +768,19 @@ bool startWS(
 #else
     config.jwt = nullptr;
 #endif
-	return config.descriptor != NULL;
+	return config.descriptor != nullptr;
 }
 
 void doneWS(
 	WSConfig &config
 ) {
-	setLogCallback(NULL);
+	setLogCallback(nullptr);
 	if (config.descriptor)
 		MHD_stop_daemon((struct MHD_Daemon *) config.descriptor);
 	if (logCB) {
 		logCB(&config, LOG_INFO, MODULE_WS, 0, "web service stopped");
 	}
-	config.descriptor = NULL;
+	config.descriptor = nullptr;
 #ifdef ENABLE_JWT
     if (config.jwt)
         delete (AuthJWT*) config.jwt;

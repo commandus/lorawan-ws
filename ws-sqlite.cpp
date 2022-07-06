@@ -179,9 +179,7 @@ int parseCmd
 #endif
 
 	if (a_logfile->count)
-	{
 		logFileStrm = new std::ofstream(*a_logfile->filename);
-	}
 
 	if (a_listenport->count)
 		retval->port = *a_listenport->ival;
@@ -194,12 +192,11 @@ int parseCmd
 		retDbConnection = DEF_DB_FN;
 
 	if (!createTable) {
-	// check database connection
-	if (!checkDbConnection(retDbConnection))
-		{
-			std::cerr << "Invalid database file " << retDbConnection << std::endl;
-			return 2;
-		}
+        // check database connection
+        if (!checkDbConnection(retDbConnection)) {
+            std::cerr << "Invalid database file " << retDbConnection << std::endl;
+            return 2;
+        }
 	}
 
 	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));

@@ -37,6 +37,12 @@ ws-sqlite - веб сервер HTTP/1.0
 wget http://localhost:5002/t?o=0&s=10
 ```
 
+Запустите веб сервис, указав в опции -i JWT issuer name и в -s пароль:
+
+```
+./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -r ../lorawan-ws-angular/lorawan-ws-angular/dist/lorawan-ws-angular -l 1.log -i "local" -s "1-2-3"
+```
+
 ## Параметры командной строки
 
 - -p, --port=<port>         port number. Default 5002
@@ -178,9 +184,18 @@ kosa-ge=11&kosa-le=22
 
 Сборка с авторизацией по JWT токену
 
-```
+GNU Autoconf/Automake:
+```shell
 ./autogen.sh
 ./configure --enable-jwt
+make
+```
+
+CMake:
+```shell
+mkdir build
+cd build
+cmake -DENABLE_JWT=ON ..
 make
 ```
 
