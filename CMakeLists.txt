@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+option(ENABLE_JWT "Enable JWT" OFF)
+
 # find_package(unofficial-sqlite3 CONFIG REQUIRED)
 # target_link_libraries(main PRIVATE unofficial::sqlite3::sqlite3)
 
@@ -27,10 +29,20 @@ set(LIB_LORAWAN_WS_SRC
 	lorawan-ws.cpp
 )
 
+set(EXTRA_LIBS )
+set(EXTRA_DEF )
+if(ENABLE_JWT)
+	set(WS_SQLITE_SOURCES ${WS_SQLITE_SOURCES} auth-jwt.cpp)
+	set(LIB_LORAWAN_WS_SRC ${LIB_LORAWAN_WS_SRC} auth-jwt.cpp)
+	set(EXTRA_LIBS crypto ssl)
+	set(EXTRA_DEF ENABLE_JWT)
+endif()
+
 add_executable(ws-sqlite ${WS_SQLITE_SOURCES})
 target_link_libraries(ws-sqlite PRIVATE Threads::Threads
-	${DB_LIB} ${HTTPD_LIB}
+	${DB_LIB} ${HTTPD_LIB} ${EXTRA_LIBS}
 )
+target_compile_definitions(ws-sqlite PUBLIC ${EXTRA_DEF})
 
 add_library(lorawan STATIC
 	${LIB_LORAWAN_WS_SRC}
