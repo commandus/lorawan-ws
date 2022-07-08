@@ -607,6 +607,7 @@ static MHD_Result httpError401(
     struct MHD_Response *response = MHD_create_response_from_buffer(strlen(MSG401), (void *) MSG401, MHD_RESPMEM_PERSISTENT);
     std::string hwa = "Bearer error=\"invalid_token\"";
     MHD_add_response_header(response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, hwa.c_str());
+    addCORS(response);
     MHD_Result r = MHD_queue_response(connection, hc, response);
     MHD_destroy_response(response);
     return r;
@@ -704,9 +705,6 @@ static MHD_Result request_callback(
                 fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
                 MHD_destroy_response(specResponse);
                 return fr;
-            } else {
-                if (!authorized)
-                    return httpError401(connection);
             }
         }
 
