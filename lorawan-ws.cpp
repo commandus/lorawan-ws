@@ -708,7 +708,7 @@ static MHD_Result request_callback(
             std::map<std::string, std::string> q;
             MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, putStringVector, &q);
             int responseCode = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
-                MODULE_WS, url, method, version, q, upload_data, upload_data_size, false);
+                MODULE_WS, url, method, version, q, upload_data, upload_data_size, authorized);
 
             switch (responseCode) {
                 case 200: {
