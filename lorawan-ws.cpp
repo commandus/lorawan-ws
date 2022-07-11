@@ -185,6 +185,7 @@ typedef enum {
 	START_FETCH_DB_BIND_PARAM = 4
 } START_FETCH_DB_RESULT;
 
+const static char *MSG_HTTP_ERROR = "Error";
 const static char *MSG404 = "404 not found";
 const static char *MSG401 = "Unauthorized";
 
@@ -600,6 +601,18 @@ static MHD_Result putStringVector(
     return MHD_YES;
 }
 
+static MHD_Result httpError(
+    struct MHD_Connection *connection,
+    int code
+)
+{
+    struct MHD_Response *response = MHD_create_response_from_buffer(strlen(MSG_HTTP_ERROR), (void *) MSG_HTTP_ERROR, MHD_RESPMEM_PERSISTENT);
+    addCORS(response);
+    MHD_Result r = MHD_queue_response(connection, code, response);
+    MHD_destroy_response(response);
+    return r;
+}
+
 static MHD_Result httpError401(
     struct MHD_Connection *connection
 )
@@ -697,22 +710,27 @@ static MHD_Result request_callback(
             int responseCode = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
                 MODULE_WS, url, method, version, q, upload_data, upload_data_size, false);
 
-            if (responseCode == 200) {
-                if (ct.empty())
-                    ct = CT_JSON;
-                specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(), MHD_RESPMEM_MUST_COPY);
-                addCORS(specResponse);
-                MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
-                fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
-                MHD_destroy_response(specResponse);
-                return fr;
+            switch (responseCode) {
+                case 200: {
+                    if (ct.empty())
+                        ct = CT_JSON;
+                    specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(),
+                        MHD_RESPMEM_MUST_COPY);
+                    addCORS(specResponse);
+                    MHD_add_response_header(specResponse, MHD_HTTP_HEADER_CONTENT_TYPE, ct.c_str());
+                    fr = MHD_queue_response(connection, MHD_HTTP_OK, specResponse);
+                    MHD_destroy_response(specResponse);
+                    return fr;
+                case 401:
+                    return httpError401(connection);
+                case 404:
+                    // try load from the file system
+                    return processFile(connection, buildFileName(requestenv->config->dirRoot, url));
+                default:
+                    return httpError(connection, responseCode);
+                }
             }
         }
-
-        // try load from the file system
-        std::string fn = buildFileName(requestenv->config->dirRoot, url);
-        fr = processFile(connection, fn);
-        return fr;
 	}
 
     if (!authorized)
