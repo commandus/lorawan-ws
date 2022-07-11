@@ -45,11 +45,11 @@ typedef std::function<void(
  * @param upload_data HTTP request uploaded data
  * @param upload_data_size HTTP request uploaded data size, bytes
  * @param authorized true- user authorized successfully
- * @return true- OK
+ * @return 200- OK
   */
 class WebServiceRequestHandler {
 public:
-    virtual bool handle(
+    virtual int handle(
         std::string &content,
         std::string &contentType,
         void *env,
@@ -88,7 +88,7 @@ typedef struct {
 	LOG_CALLBACK onLog;
     WebServiceRequestHandler *onSpecialPathHandler;
 
-    // Authorization
+    // Authentication
     void *jwt;
     std::string issuer;
     std::string secret;

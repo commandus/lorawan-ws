@@ -69,7 +69,7 @@ static void onLogFile(
 }
 
 class WsDumbRequestHandler : public WebServiceRequestHandler {
-    bool handle(
+    int handle(
         std::string &content,
         std::string &contentType,
         void *env,

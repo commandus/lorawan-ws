@@ -6,9 +6,9 @@ AuthJWT::AuthJWT(
 )
     : issuer(aIssuer)
 {
-    verifier = &jwt::verify()
-        .allow_algorithm(jwt::algorithm::hs256{ secret })
-        .with_issuer(issuer);
+    verifier = new jwt::verifier<jwt::default_clock, jwt::traits::kazuho_picojson>(jwt::default_clock{});
+    verifier->allow_algorithm(jwt::algorithm::hs256{ secret })
+        .with_issuer(aIssuer);
 }
 
 AuthJWT::~AuthJWT()
@@ -21,6 +21,7 @@ bool AuthJWT::verify(
 )
 {
     const jwt::decoded_jwt<jwt::traits::kazuho_picojson> s = jwt::decode(token);
+
     std::error_code ec;
     verifier->verify(s, ec);
     return ec.value() == 0;

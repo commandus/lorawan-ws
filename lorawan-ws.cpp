@@ -173,8 +173,9 @@ const static char *CT_TTF = "font/ttf";
 const static char *CT_BIN = "application/octet";
 const static char *HDR_CORS_ORIGIN = "*";
 const static char *HDR_CORS_CREDENTIALS = "true";
-const static char *HDR_CORS_METHODS = "GET,HEAD,OPTIONS,POST,PUT";
-const static char *HDR_CORS_HEADERS = "Authentication, Access-Control-Allow-Headers, Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers";
+const static char *HDR_CORS_METHODS = "GET,HEAD,OPTIONS,POST,PUT,DELETE";
+const static char *HDR_CORS_HEADERS = "Authorization, Access-Control-Allow-Headers, "
+    "Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers";
 
 typedef enum {
 	START_FETCH_DB_OK = 0,
@@ -633,7 +634,6 @@ static MHD_Result request_callback(
 		*ptr = &aptr;
 		return MHD_YES;
 	}
-
     if (strcmp(method, "OPTIONS") == 0) {
         response = MHD_create_response_from_buffer(strlen(MSG500[0]), (void *) MSG500[0], MHD_RESPMEM_PERSISTENT);
         MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
@@ -642,7 +642,6 @@ static MHD_Result request_callback(
         MHD_destroy_response(response);
         return MHD_YES;
     }
-
     *ptr = nullptr;					// reset when done
 
     RequestEnv *requestenv = (RequestEnv *) malloc(sizeof(RequestEnv));
@@ -655,9 +654,9 @@ static MHD_Result request_callback(
 		response = MHD_create_response_from_buffer(strlen(MSG500[1]), (void *) MSG500[1], MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response(connection, hc, response);
 		MHD_destroy_response(response);
-		return ret;
-	}
 
+        return ret;
+	}
 	requestenv->request.requestType = parseRequestType(url);
 
     bool authorized = true;
@@ -677,6 +676,7 @@ static MHD_Result request_callback(
                     jwt.erase(jwt.begin(), std::find_if(jwt.begin(), jwt.end(), [](unsigned char ch) {
                         return !std::isspace(ch);
                     }));
+
                 }
                 authorized = aj->verify(jwt);
             } else
@@ -694,9 +694,10 @@ static MHD_Result request_callback(
 
             std::map<std::string, std::string> q;
             MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, putStringVector, &q);
-            bool processed = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
+            int responseCode = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
                 MODULE_WS, url, method, version, q, upload_data, upload_data_size, false);
-            if (processed) {
+
+            if (responseCode == 200) {
                 if (ct.empty())
                     ct = CT_JSON;
                 specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(), MHD_RESPMEM_MUST_COPY);
