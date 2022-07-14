@@ -109,6 +109,11 @@ const char *pathSelectPrefix[PATH_COUNT] = {
 	"SELECT id, kosa, year, no, measured, parsed, vcc, vbat, t, tp, raw, devname, loraaddr, received FROM logger_lora WHERE id = ?1"
 };
 
+const char *pathDeletePrefix[2] = {
+    "DELETE FROM logger_raw",
+    "DELETE FROM logger_lora"
+};
+
 const char *pathSelectSuffix[PATH_COUNT] = {
 	"ORDER BY id DESC LIMIT ?1, ?2;",
 	"ORDER BY id DESC LIMIT ?1, ?2;",
@@ -188,6 +193,7 @@ typedef enum {
 const static char *MSG_HTTP_ERROR = "Error";
 const static char *MSG404 = "404 not found";
 const static char *MSG401 = "Unauthorized";
+const static char *MSG_DELETE_OK = "{\"result\": 0}";
 
 const static char *MSG500[5] = {
 	"",                                     // 0
@@ -240,7 +246,7 @@ const char *requestTypeString(RequestType value)
 		return "???";
 }
 
-void *uri_logger_callback (void *cls, const char *uri)
+void *uri_logger_callback(void *cls, const char *uri)
 {
 	if (logCB)
 		logCB(cls, LOG_INFO, MODULE_WS, 0, uri);
@@ -378,6 +384,58 @@ static std::string buildFileName(const char *dirRoot, const char *url)
 	return r.str();
 }
 
+/**
+ * Add WHERE clause if any query parameter found
+ * @param retval return WHERE clause
+ * @param connection MHD connection to read query paramaters
+ * @return true- at least one parameter substituted
+ */
+static bool buildWhereParameters(
+        std::stringstream &retval,
+        MHD_Connection *connection
+) {
+    bool isFirst = true;
+    for (int i = QUERY_PARAMS_OPTIONAL_MIN; i <= QUERY_PARAMS_OPTIONAL_MAX; i++) {
+        const char *pn = queryParamNames[i];
+        const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pn);
+        if (c) {
+            // equals
+            if (isFirst) {
+                retval << " WHERE ";
+                isFirst = false;
+            } else {
+                retval << " AND ";
+            }
+            retval << pn << " = ";
+            if (queryParamIsString[i])
+                retval << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
+            else
+                retval << c;
+            // do not check other conditions
+            continue;
+        }
+        for (int pns = 0; pns < QUERY_PARAMS_SUFFIX_SIZE; pns++) {
+            std::string pnc = std::string(pn) + queryParamSuffix[pns];
+            const char* cc = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pnc.c_str());
+            if (cc) {
+                if (isFirst) {
+                    retval << " WHERE ";
+                    isFirst = false;
+                } else
+                    retval << " AND ";
+                retval << pn << " " << queryParamSQLComparisonOperator[pns] << " ";
+                if (queryParamIsString[i])
+                    retval << SQL_STRING_QUOTE << cc << SQL_STRING_QUOTE;
+                else
+                    retval << cc;
+                // Do not break, check other conditions
+                // break;
+            }
+        }
+    }
+    return !isFirst;
+}
+
 static START_FETCH_DB_RESULT startFetchDb(
 	struct MHD_Connection *connection,
 	RequestEnv *env
@@ -386,53 +444,18 @@ static START_FETCH_DB_RESULT startFetchDb(
 	std::stringstream pathSelectSS;
 	pathSelectSS << pathSelectPrefix[env->request.requestType];
 	// get by identifier- no optional conditions
-	if (!((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1))) {
-		// build WHERE clause
-		bool isFirst = true;
-		for (int i = QUERY_PARAMS_OPTIONAL_MIN; i <= QUERY_PARAMS_OPTIONAL_MAX; i++) {
-			const char *pn = queryParamNames[i];
-			const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pn);
-			if (c) {
-				// equals
-				if (isFirst) {
-					pathSelectSS << " WHERE ";
-					isFirst = false;
-				} else {
-					pathSelectSS << " AND ";
-				}
-				pathSelectSS << pn << " = ";
-				if (queryParamIsString[i])
-					pathSelectSS << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
-				else
-					pathSelectSS << c;
-				// do not check other conditions
-				continue;
-			}
-			for (int pns = 0; pns < QUERY_PARAMS_SUFFIX_SIZE; pns++) {
-				std::string pnc = std::string(pn) + queryParamSuffix[pns];
-				const char* cc = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, pnc.c_str());
-				if (cc) {
-					if (isFirst) {
-						pathSelectSS << " WHERE ";
-						isFirst = false;
-					} else
-						pathSelectSS << " AND ";
-					pathSelectSS << pn << " " << queryParamSQLComparisonOperator[pns] << " ";
-					if (queryParamIsString[i])
-						pathSelectSS << SQL_STRING_QUOTE << cc << SQL_STRING_QUOTE;
-					else
-						pathSelectSS << cc;
-					// Do not break, check other contitions
-					// break;
-				}
-			}
-		}
-	}
+	if ((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1)) {
+        const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[2]);
+        if (!c)
+            return START_FETCH_DB_NO_PARAM;
+        pathSelectSS << " WHERE " << queryParamNames[2] << " = " << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
+    } else {
+        buildWhereParameters(pathSelectSS, connection);
+        // finish WHERE clause
+        pathSelectSS << " " << pathSelectSuffix[env->request.requestType];
+    }
 
-	// finish WHERE clause
-	pathSelectSS << " " << pathSelectSuffix[env->request.requestType];
-	std::string pathSelect = pathSelectSS.str();
-
+    std::string pathSelect = pathSelectSS.str();
 	// preparation
 	int r = env->db->cursorOpen(&env->stmt, pathSelect);
 	if (r) {
@@ -447,39 +470,41 @@ static START_FETCH_DB_RESULT startFetchDb(
 		return START_FETCH_DB_PREPARE_FAILED;
     }
 
-	// bind required params
-	for (int i = 0; i < QUERY_PARAMS_REQUIRED_MAX; i++)	{
-		int v = pathRequiredParams[env->request.requestType][i];
-		if (v == EOP)
-			break; // no more parameters
-		const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);
-		if (!c) {
-			if (logCB) {
-				std::stringstream ss;
-				ss << "Binding parameter #" << i + 1
-					<< " " << queryParamNames[v]
-					<< " empty";
-				logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
-			}
-			env->db->cursorClose(env->stmt);
-			return START_FETCH_DB_NO_PARAM;
-		} else {	
-			r = env->db->cursorBindText(env->stmt, i + 1, c);
-			if (r) {
-				if (logCB) {
-					std::stringstream ss;
-					ss << "Bind parameter error "
-						<< r << ": " << env->db->errmsg
-						<< ", parameter #" << i + 1
-						<< " " << queryParamNames[v]
-						<< " = " << c;
-					logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
-				}
-				env->db->cursorClose(env->stmt);
-				return START_FETCH_DB_BIND_PARAM;
-			}
-		}
-	}
+    if (!((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1))) {
+        // bind required params if no id
+        for (int i = 0; i < QUERY_PARAMS_REQUIRED_MAX; i++) {
+            int v = pathRequiredParams[env->request.requestType][i];
+            if (v == EOP)
+                break; // no more parameters
+            const char *c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[v]);
+            if (!c) {
+                if (logCB) {
+                    std::stringstream ss;
+                    ss << "Binding parameter #" << i + 1
+                       << " " << queryParamNames[v]
+                       << " empty";
+                    logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+                }
+                env->db->cursorClose(env->stmt);
+                return START_FETCH_DB_NO_PARAM;
+            } else {
+                r = env->db->cursorBindText(env->stmt, i + 1, c);
+                if (r) {
+                    if (logCB) {
+                        std::stringstream ss;
+                        ss << "Bind parameter error "
+                           << r << ": " << env->db->errmsg
+                           << ", parameter #" << i + 1
+                           << " " << queryParamNames[v]
+                           << " = " << c;
+                        logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+                    }
+                    env->db->cursorClose(env->stmt);
+                    return START_FETCH_DB_BIND_PARAM;
+                }
+            }
+        }
+    }
 	return START_FETCH_DB_OK;
 }
 
@@ -627,6 +652,50 @@ static MHD_Result httpError401(
     return r;
 }
 
+/**
+ * Delete records
+ * @param connection MHD connection
+ * @param env MHD request
+ * @return 0- OK, 1- Database connection not established, 2- SQL statement preparation failed, 3- Required parameter missed, 4- Binding parameter failed
+ */
+static START_FETCH_DB_RESULT deleteFromDb(
+    MHD_Connection *connection,
+    RequestEnv *env
+) {
+    if ((env->request.requestType > RT_T_1) || (env->request.requestType ==	RT_RAW_COUNT)
+        || (env->request.requestType == RT_T_COUNT))
+        return START_FETCH_DB_NO_PARAM;
+    std::stringstream clauseDeleteSS;
+    clauseDeleteSS << pathDeletePrefix[env->request.requestType & 1];
+    if ((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1)) {
+        // delete by identifier
+        const char* c = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, queryParamNames[2]);
+        clauseDeleteSS << " WHERE " << queryParamNames[2] << " = " << SQL_STRING_QUOTE << c << SQL_STRING_QUOTE;
+    } else {
+        // delete by query parameters
+        if (!buildWhereParameters(clauseDeleteSS, connection))
+            return START_FETCH_DB_NO_PARAM; // prevent delete any records without parameters
+    }
+
+    std::string pathDelete = clauseDeleteSS.str();
+
+
+    int r = env->db->exec(pathDelete);
+
+    if (r) {
+        if (logCB) {
+            std::stringstream ss;
+            ss << "Delete error " << r
+               << ": " << env->db->errmsg
+               << " db " << env->db->type
+               << " SQL " << pathDelete.c_str();
+            logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+        }
+        return START_FETCH_DB_PREPARE_FAILED;
+    }
+    return START_FETCH_DB_OK;
+}
+
 static MHD_Result request_callback(
 	void *cls,			// struct WSConfig*
 	struct MHD_Connection *connection,
@@ -647,6 +716,7 @@ static MHD_Result request_callback(
 		*ptr = &aptr;
 		return MHD_YES;
 	}
+
     if (strcmp(method, "OPTIONS") == 0) {
         response = MHD_create_response_from_buffer(strlen(MSG500[0]), (void *) MSG500[0], MHD_RESPMEM_PERSISTENT);
         MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
@@ -661,7 +731,9 @@ static MHD_Result request_callback(
 	requestenv->state.state = 0;
 	requestenv->config = (WSConfig*) cls;
 	requestenv->db = findDatabaseByName(connection, requestenv->config->databases);
-	if (!requestenv->db) {
+
+
+    if (!requestenv->db) {
 		// no database interface found
 		int hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		response = MHD_create_response_from_buffer(strlen(MSG500[1]), (void *) MSG500[1], MHD_RESPMEM_PERSISTENT);
@@ -673,6 +745,7 @@ static MHD_Result request_callback(
 	requestenv->request.requestType = parseRequestType(url);
 
     bool authorized = true;
+
 #ifdef ENABLE_JWT
     AuthJWT *aj = (AuthJWT *) ((WSConfig*) cls)->jwt;
     if (aj) {
@@ -732,22 +805,39 @@ static MHD_Result request_callback(
             }
         }
 	}
-
     if (!authorized)
         return httpError401(connection);
 
-    int r = (int) startFetchDb(connection, requestenv);
-	int hc;
-	if (r) {
-		hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
-		response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
-	} else {
-		hc = MHD_HTTP_OK;
-		response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv, &chunk_done_callback);
-	}
+    int hc;
+    if (strcmp(method, "DELETE") == 0) {
+        // DELETE
+        int r = (int) deleteFromDb(connection, requestenv);
+        if (r) {
+            if (logCB) {
+                std::stringstream ss;
+                ss << "DELETE error " << r;
+                logCB(requestenv->config, LOG_ERR, MODULE_WS, 0, ss.str());
+            }
+            hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+            response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
+        } else {
+            hc = MHD_HTTP_OK;
+            response = MHD_create_response_from_buffer(strlen(MSG_DELETE_OK), (void *) MSG_DELETE_OK, MHD_RESPMEM_PERSISTENT);
+        }
+    } else {
+        // SELECT
+        int r = (int) startFetchDb(connection, requestenv);
+        if (r) {
+            hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+            response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
+        } else {
+            hc = MHD_HTTP_OK;
+            response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 1024, &chunk_callbackFetchDb, requestenv,
+                &chunk_done_callback);
+        }
+    }
     MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, CT_JSON);
     addCORS(response);
-
 	ret = MHD_queue_response(connection, hc, response);
 	MHD_destroy_response(response);
 	return ret;
@@ -762,7 +852,7 @@ bool startWS(
 	struct MHD_Daemon *d = MHD_start_daemon(
 		config.flags, config.port, nullptr, nullptr,
 		&request_callback, &config,
-		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
+		MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,  // 2 minutes timout
 		MHD_OPTION_THREAD_POOL_SIZE, config.threadCount,
 		MHD_OPTION_URI_LOG_CALLBACK, &uri_logger_callback, nullptr,
 		MHD_OPTION_CONNECTION_LIMIT, config.connectionLimit,
