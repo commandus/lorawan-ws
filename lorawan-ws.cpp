@@ -861,9 +861,7 @@ bool startWS(
 	config.descriptor = (void *) d;
 	setLogCallback(config.onLog);
 	if (logCB) {
-		if (config.descriptor) {
-			logCB(&config, LOG_INFO, MODULE_WS, 0, "web service started");
-		} else {
+		if (!config.descriptor) {
 			std::stringstream ss;
 			ss << "Start web service error " << errno
 				<< ": " << strerror(errno);
