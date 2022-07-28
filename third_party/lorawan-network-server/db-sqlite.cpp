@@ -1,4 +1,7 @@
 #include "db-sqlite.h"
+#if SQLITE_VERSION_NUMBER <= 3007013
+#define sqlite3_errstr(r) sqlite3_errmsg(db);
+#endif
 
 DatabaseSQLite::DatabaseSQLite()
 	: db(NULL)
@@ -105,8 +108,8 @@ int DatabaseSQLite::cursorBindText(
 	long int v = strtol(value.c_str(), NULL, 10);
 	int r = sqlite3_bind_int((sqlite3_stmt *) stmt, position1, v);
 	if (r)
-		errmsg = sqlite3_errstr(r);
-	return r;
+        errmsg = sqlite3_errstr(r);
+    return r;
 }
 
 int DatabaseSQLite::cursorColumnCount(
@@ -151,7 +154,7 @@ DB_FIELD_TYPE DatabaseSQLite::cursorColumnType(
 {
 	int r = sqlite3_step((sqlite3_stmt *) stmt);
 	if (r != SQLITE_ROW)
-		errmsg = sqlite3_errstr(r);
+        errmsg = sqlite3_errstr(r);
 	return (r == SQLITE_ROW);
 }
 
@@ -161,6 +164,6 @@ int DatabaseSQLite::cursorClose(
 {
 	int r = sqlite3_finalize((sqlite3_stmt *) stmt);
 	if (r)
-		errmsg = sqlite3_errstr(r);
-	return r;
+        errmsg = sqlite3_errstr(r);
+return r;
 }
