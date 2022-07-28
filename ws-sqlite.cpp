@@ -111,6 +111,7 @@ int parseCmd
 )
 {
 	struct arg_int *a_listenport = arg_int0("p", "port", "<port>", "port number. Default 5002");
+    struct arg_int *a_listenflags = arg_int0("f", "flags", "<number>", "0- defaults");
 	struct arg_str *a_dirroot = arg_str0("r", "root", "<path>", "web root path. Default './html'");
 	struct arg_str *a_database = arg_str0("d", "database", "<file>", "SQLite database file name. Default " DEF_DB_FN);
 
@@ -126,7 +127,7 @@ int parseCmd
 	struct arg_lit *a_help = arg_lit0("h", "help", "Show this help");
 	struct arg_end *a_end = arg_end(20);
 
-	void* argtable[] = { a_listenport, a_dirroot, a_database, a_logfile,
+	void* argtable[] = { a_listenport, a_listenflags, a_dirroot, a_database, a_logfile,
 #ifdef ENABLE_JWT
         a_issuer, a_secret,
 #endif
@@ -170,7 +171,11 @@ int parseCmd
 
 	retval->threadCount = NUMBER_OF_THREADS;
 	retval->connectionLimit = 1024;
-	retval->flags = MHD_START_FLAGS;
+    if (a_listenflags->count) {
+        retval->flags = *a_listenflags->ival;
+    } else {
+        retval->flags = MHD_START_FLAGS;
+    }
 	retval->onLog = onLogFile;
 
 #ifdef ENABLE_JWT
