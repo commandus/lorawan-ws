@@ -15,7 +15,8 @@
 
 typedef std::map<std::string, DatabaseIntf*> MAP_NAME_DATABASE;
 
-#define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
+// #define MHD_START_FLAGS 	MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | MHD_USE_TCP_FASTOPEN | MHD_USE_TURBO
+#define MHD_START_FLAGS MHD_USE_SELECT_INTERNALLY
 
 /**
  * Log callback function prototype
@@ -70,8 +71,8 @@ public:
 typedef struct {
 	unsigned int threadCount;
 	unsigned int connectionLimit;
+    // listener flags
 	unsigned int flags;
-
 	// listener port
 	int port;
 	// last error code
