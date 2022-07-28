@@ -23,7 +23,7 @@ void *dbconnect(
 const char *CREATE_STATEMENTS[2] = {
 	"CREATE TABLE \"logger_raw\"(\"id\" INTEGER PRIMARY KEY, \"raw\" text, devname text, loraaddr text, received text);",
 	"CREATE TABLE \"logger_lora\"(\"id\" INTEGER PRIMARY KEY, \"kosa\" integer, \"year\" integer, \"no\" integer, "
-		"\"measured\" integer, \"parsed\" integer, \"vcc\" float, \"vbat\" float, \"t\" text, \"tp\" text, \"raw\" text, "
+		"\"measured\" integer, \"parsed\" integer, \"vcc\" float, \"vbat\" float, \"t\" text, \"tp\" text, \"th\" text, \"raw\" text, "
 		"devname text, loraaddr text, received text);"
 };
 
