@@ -316,3 +316,113 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=D:/git/vcpkg/scripts/buildsystems/vcpkg.cmake -D
 ```
 
 Запустите созданное решение в Visual Studio, выберите конфигурацию Release и соберите проект ws-sqlite.
+
+##  Флаги
+
+MHD_USE_ERROR_LOG = 1,
+
+Run in debug mode.  If this flag is used, the library should
+print error messages and warnings to `stderr`.
+MHD_USE_DEBUG = 1,
+
+Run in HTTPS mode.  The modern protocol is called TLS.
+MHD_USE_TLS = 2,
+
+Run using one thread per connection.
+Must be used only with #MHD_USE_INTERNAL_POLLING_THREAD.
+MHD_USE_THREAD_PER_CONNECTION = 4,
+
+Run using an internal thread (or thread pool) for sockets sending
+and receiving and data processing. Without this flag MHD will not
+run automatically in background thread(s).
+If this flag is set, #MHD_run() and #MHD_run_from_select() couldn't
+be used.
+This flag is set explicitly by #MHD_USE_POLL_INTERNAL_THREAD and
+by #MHD_USE_EPOLL_INTERNAL_THREAD.
+When this flag is not set, MHD run in "external" polling mode.
+MHD_USE_INTERNAL_POLLING_THREAD = 8,
+
+Run using the IPv6 protocol (otherwise, MHD will just support
+IPv4).  If you want MHD to support IPv4 and IPv6 using a single
+socket, pass #MHD_USE_DUAL_STACK, otherwise, if you only pass
+this option, MHD will try to bind to IPv6-only (resulting in
+no IPv4 support).
+MHD_USE_IPv6 = 16,
+
+Be pedantic about the protocol (as opposed to as tolerant as
+possible).  Specifically, at the moment, this flag causes MHD to
+reject HTTP 1.1 connections without a "Host" header.  This is
+required by the standard, but of course in violation of the "be
+as liberal as possible in what you accept" norm.  It is
+recommended to turn this ON if you are testing clients against
+MHD, and OFF in production.
+MHD_USE_PEDANTIC_CHECKS = 32,
+
+Use `poll()` instead of `select()` for polling sockets.
+This allows sockets with `fd >= FD_SETSIZE`.
+This option is not compatible with an "external" polling mode
+(as there is no API to get the file descriptors for the external
+poll() from MHD) and must also not be used in combination
+with #MHD_USE_EPOLL.
+MHD_USE_POLL = 64,
+
+Run using an internal thread (or thread pool) doing `poll()`.
+MHD_USE_POLL_INTERNAL_THREAD = MHD_USE_POLL | MHD_USE_INTERNAL_POLLING_THREAD,
+
+Suppress (automatically) adding the 'Date:' header to HTTP responses.
+This option should ONLY be used on systems that do not have a clock
+and that DO provide other mechanisms for cache control.  See also
+RFC 2616, section 14.18 (exception 3).
+MHD_USE_SUPPRESS_DATE_NO_CLOCK = 128,
+
+Run without a listen socket.  This option only makes sense if
+MHD_add_connection is to be used exclusively to connect HTTP
+clients to the HTTP server.  This option is incompatible with
+using a thread pool; if it is used, #MHD_OPTION_THREAD_POOL_SIZE
+is ignored.
+MHD_USE_NO_LISTEN_SOCKET = 256,
+
+Use `epoll()` instead of `select()` or `poll()` for the event loop.
+This option is only available on some systems; using the option on
+systems without epoll will cause #MHD_start_daemon to fail.  Using
+this option is not supported with #MHD_USE_THREAD_PER_CONNECTION.
+MHD_USE_EPOLL = 512,
+
+Run using an internal thread (or thread pool) doing `epoll` polling.
+This option is only available on certain platforms; using the option on
+platform without `epoll` support will cause #MHD_start_daemon to fail.
+MHD_USE_EPOLL_INTERNAL_THREAD = MHD_USE_EPOLL  | MHD_USE_INTERNAL_POLLING_THREAD,
+
+Use inter-thread communication channel.  #MHD_USE_ITC can be used with #MHD_USE_INTERNAL_POLLING_THREAD
+and is ignored with any "external" sockets polling. It's required for use of #MHD_quiesce_daemon
+or #MHD_add_connection. This option is enforced by #MHD_ALLOW_SUSPEND_RESUME or MHD_USE_NO_LISTEN_SOCKET. MHD_USE_ITC is always used automatically on platforms
+where select()/poll()/other ignore shutdown of listen socket.
+MHD_USE_ITC = 1024
+
+Use a single socket for IPv4 and IPv6.
+MHD_USE_DUAL_STACK = MHD_USE_IPv6 | 2048,
+
+Enable `turbo`.  Disables certain calls to `shutdown()`, enables aggressive non-blocking optimistic reads and
+other potentially unsafe optimizations. Most effects only happen with #MHD_USE_EPOLL.
+MHD_USE_TURBO = 4096,
+
+Enable suspend/resume functions, which also implies setting up ITC to signal resume.
+MHD_ALLOW_SUSPEND_RESUME = 8192 | MHD_USE_ITC,
+
+Enable TCP_FASTOPEN option.  This option is only available on Linux with a kernel >= 3.6.  On other systems, using this option cases #MHD_start_daemon to fail.
+MHD_USE_TCP_FASTOPEN = 16384
+
+You need to set this option if you want to use HTTP "Upgrade". "Upgrade" may require usage of additional internal resources,
+which we do not want to use unless necessary.
+MHD_ALLOW_UPGRADE = 32768
+
+Automatically use best available polling function.
+MHD_USE_AUTO = 65536
+
+MHD_USE_AUTO_INTERNAL_THREAD = MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD,
+
+Flag set to enable post-handshake client authentication only useful in combination with #MHD_USE_TLS
+MHD_USE_POST_HANDSHAKE_AUTH_SUPPORT = 1U << 17
+
+Flag set to enable TLS 1.3 early data.  This has
+MHD_USE_INSECURE_TLS_EARLY_DATA = 1U << 18
