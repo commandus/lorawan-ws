@@ -18,7 +18,7 @@ nobase_dist_include_HEADERS = \
 	platform.h lorawan-ws.h db-helper.h auth-jwt.h \
 	third_party/argtable3/argtable3.h \
 	third_party/daemonize/daemonize.h \
-	third_party/db-intf.h \
+	third_party/db-intf.h log-intf.h \
 	third_party/lorawan-network-server/db-sqlite.h \
 	third_party/jwt-cpp/jwt.h third_party/jwt-cpp/base.h third_party/picojson/picojson.h
 
