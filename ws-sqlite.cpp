@@ -56,17 +56,25 @@ std::string getPathFirstFragments(const std::string &value)
 		return value;
 }
 
-static void onLogFile(
-	void *env,
-	int level,
-	int modulecode,
-	int errorcode,
-	const std::string &message
-)
-{
-	if (logFileStrm)
-		*logFileStrm << errorcode << "\t" << message << std::endl;
-}
+class StdErrOrFileLog: public LogIntf {
+public:
+    void logMessage(
+        void *env,
+        int level,
+        int moduleCode,
+        int errorCode,
+        const std::string &message
+    ) override {
+        struct timeval t;
+        gettimeofday(&t, nullptr);
+		if (logFileStrm) 
+			*logFileStrm << message << std::endl;
+		else
+			std::cerr << message << std::endl;
+    }
+};
+
+StdErrOrFileLog stdErrOrFileLog;
 
 class WsDumbRequestHandler : public WebServiceRequestHandler {
     int handle(
@@ -176,7 +184,7 @@ int parseCmd
     } else {
         retval->flags = MHD_START_FLAGS;
     }
-	retval->onLog = onLogFile;
+	retval->onLog = &stdErrOrFileLog;
 
 #ifdef ENABLE_JWT
     retval->issuer = *a_issuer->sval;

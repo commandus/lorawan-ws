@@ -1,7 +1,3 @@
-/**
- *
- */
-
 #include <cstdlib>
 #include <cstdbool>
 #include <cstring>
@@ -51,14 +47,9 @@
 #include "auth-jwt.h"
 #endif
 
-static LOG_CALLBACK logCB = nullptr;
+#include "log-intf.h"
 
-void setLogCallback(
-    LOG_CALLBACK value
-)
-{
-	logCB = value;
-}
+static LogIntf *logCB = nullptr;
 
 #define PATH_COUNT 6
 
@@ -249,7 +240,7 @@ const char *requestTypeString(RequestType value)
 void *uri_logger_callback(void *cls, const char *uri)
 {
 	if (logCB)
-		logCB(cls, LOG_INFO, MODULE_WS, 0, uri);
+		logCB->logMessage(cls, LOG_INFO, MODULE_WS, 0, uri);
 	return nullptr;
 }
 
@@ -262,7 +253,7 @@ static int doneFetch(
 	int r = env->db->cursorClose(env->stmt);
 	if (r) {
 		if (logCB)
-			logCB(env, LOG_ERR, MODULE_WS, r, "Cursor close error " + env->db->errmsg);
+			logCB->logMessage(env, LOG_ERR, MODULE_WS, r, "Cursor close error " + env->db->errmsg);
 		return START_FETCH_DB_PREPARE_FAILED;
 	}
 	env->stmt = nullptr;
@@ -345,7 +336,7 @@ static MHD_Result processFile(
     }
 	if (file == nullptr) {
 		if (logCB)
-			logCB(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(localFileName));
+			logCB->logMessage(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(localFileName));
 
 		response = MHD_create_response_from_buffer(strlen(MSG404), (void *) MSG404, MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
@@ -465,7 +456,7 @@ static START_FETCH_DB_RESULT startFetchDb(
 				<< ": " << env->db->errmsg
 				<< " db " << env->db->type
 				<< " SQL " << pathSelect.c_str();
-			logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+			logCB->logMessage(env, LOG_ERR, MODULE_WS, r, ss.str());
 		}
 		return START_FETCH_DB_PREPARE_FAILED;
     }
@@ -483,7 +474,7 @@ static START_FETCH_DB_RESULT startFetchDb(
                     ss << "Binding parameter #" << i + 1
                        << " " << queryParamNames[v]
                        << " empty";
-                    logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+                    logCB->logMessage(env, LOG_ERR, MODULE_WS, r, ss.str());
                 }
                 env->db->cursorClose(env->stmt);
                 return START_FETCH_DB_NO_PARAM;
@@ -497,7 +488,7 @@ static START_FETCH_DB_RESULT startFetchDb(
                            << ", parameter #" << i + 1
                            << " " << queryParamNames[v]
                            << " = " << c;
-                        logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+                        logCB->logMessage(env, LOG_ERR, MODULE_WS, r, ss.str());
                     }
                     env->db->cursorClose(env->stmt);
                     return START_FETCH_DB_BIND_PARAM;
@@ -689,7 +680,7 @@ static START_FETCH_DB_RESULT deleteFromDb(
                << ": " << env->db->errmsg
                << " db " << env->db->type
                << " SQL " << pathDelete.c_str();
-            logCB(env, LOG_ERR, MODULE_WS, r, ss.str());
+            logCB->logMessage(env, LOG_ERR, MODULE_WS, r, ss.str());
         }
         return START_FETCH_DB_PREPARE_FAILED;
     }
@@ -816,7 +807,7 @@ static MHD_Result request_callback(
             if (logCB) {
                 std::stringstream ss;
                 ss << "DELETE error " << r;
-                logCB(requestenv->config, LOG_ERR, MODULE_WS, 0, ss.str());
+                logCB->logMessage(requestenv->config, LOG_ERR, MODULE_WS, 0, ss.str());
             }
             hc = MHD_HTTP_INTERNAL_SERVER_ERROR;
             response = MHD_create_response_from_buffer(strlen(MSG500[r]), (void *) MSG500[r], MHD_RESPMEM_PERSISTENT);
@@ -859,13 +850,13 @@ bool startWS(
 		MHD_OPTION_END
 	);
 	config.descriptor = (void *) d;
-	setLogCallback(config.onLog);
+	logCB = config.onLog;
 	if (logCB) {
 		if (!config.descriptor) {
 			std::stringstream ss;
 			ss << "Start web service error " << errno
 				<< ": " << strerror(errno);
-			logCB(&config, LOG_ERR, MODULE_WS, errno, ss.str());
+			logCB->logMessage(&config, LOG_ERR, MODULE_WS, errno, ss.str());
 		}
 	}
 #ifdef ENABLE_JWT
@@ -879,11 +870,11 @@ bool startWS(
 void doneWS(
 	WSConfig &config
 ) {
-	setLogCallback(nullptr);
+	logCB = nullptr;
 	if (config.descriptor)
 		MHD_stop_daemon((struct MHD_Daemon *) config.descriptor);
 	if (logCB) {
-		logCB(&config, LOG_INFO, MODULE_WS, 0, "web service stopped");
+		logCB->logMessage(&config, LOG_INFO, MODULE_WS, 0, "web service stopped");
 	}
 	config.descriptor = nullptr;
 #ifdef ENABLE_JWT
