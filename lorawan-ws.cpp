@@ -368,7 +368,7 @@ static std::string buildFileName(const char *dirRoot, const char *url)
 	if (url)
 	{
 		r << url;
-		int l = strlen(url);
+		size_t l = strlen(url);
 		if (l && (url[l - 1] == '/'))
 			r << "index.html";
 	}

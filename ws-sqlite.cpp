@@ -65,8 +65,6 @@ public:
         int errorCode,
         const std::string &message
     ) override {
-        struct timeval t;
-        gettimeofday(&t, nullptr);
 		if (logFileStrm) 
 			*logFileStrm << message << std::endl;
 		else

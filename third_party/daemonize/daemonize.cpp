@@ -144,7 +144,7 @@ VOID WINAPI ServiceCtrlHandler(DWORD CtrlCode)
 VOID WINAPI ServiceMain(DWORD argc, LPTSTR *argv)
 {
 	// Register our service control handler with the SCM
-	g_StatusHandle = RegisterServiceCtrlHandler((LPWSTR) serviceName.c_str(), ServiceCtrlHandler);
+	g_StatusHandle = RegisterServiceCtrlHandlerA((LPCSTR) serviceName.c_str(), ServiceCtrlHandler);
 	if (g_StatusHandle == NULL)
 		goto EXIT;
 	// Tell the service controller we are starting
@@ -166,7 +166,7 @@ int Daemonize::init()
 	std::wstring sn(serviceName.begin(), serviceName.end());
 	SERVICE_TABLE_ENTRY ServiceTable[] =
 	{
-		{(LPWSTR)sn.c_str(), (LPSERVICE_MAIN_FUNCTION)ServiceMain},
+		{(LPSTR)sn.c_str(), (LPSERVICE_MAIN_FUNCTION)ServiceMain},
 		{NULL, NULL}
 	};
 	if (StartServiceCtrlDispatcher (ServiceTable) == FALSE)

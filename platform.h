@@ -178,4 +178,11 @@ typedef MHD_socket MHD_pipe;
 #define IPPROTO_IPV6 IPPROTO_IPV6
 #endif
 
+#ifdef _WIN32
+#include <direct.h>
+#include <Windows.h>
+#define getcwd _getcwd
+#define PATH_MAX    MAX_PATH
+#endif
+
 #endif
