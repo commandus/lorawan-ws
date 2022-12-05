@@ -737,27 +737,25 @@ static MHD_Result request_callback(
 
     bool authorized = true;
 
+    // Verify JWT token by "Authorization: Bearer ..." header
+    std::string jwt;
+    const char *bearer = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_AUTHORIZATION);
+    if (bearer) {
+        jwt = bearer;
+        size_t p = jwt.find("Bearer");
+        if (p != std::string::npos) {
+            jwt = jwt.substr(p + 6);
+            // left trim
+            jwt.erase(jwt.begin(), std::find_if(jwt.begin(), jwt.end(), [](unsigned char ch) {
+                return !std::isspace(ch);
+            }));
+        }
+    }
 #ifdef ENABLE_JWT
     AuthJWT *aj = (AuthJWT *) ((WSConfig*) cls)->jwt;
     if (aj) {
         if (!aj->issuer.empty()) {
-            // Verify JWT token by "Authorization: Bearer ..." header
-            std::string jwt;
-            const char *bearer = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_AUTHORIZATION);
-            if (bearer) {
-                jwt = bearer;
-                size_t p = jwt.find("Bearer");
-                if (p != std::string::npos) {
-                    jwt = jwt.substr(p + 6);
-                    // left trim
-                    jwt.erase(jwt.begin(), std::find_if(jwt.begin(), jwt.end(), [](unsigned char ch) {
-                        return !std::isspace(ch);
-                    }));
-
-                }
-                authorized = aj->verify(jwt);
-            } else
-                authorized = false;
+            authorized = aj->verify(jwt);
         }
     }
 #endif
