@@ -239,8 +239,11 @@ const char *requestTypeString(RequestType value)
 
 void *uri_logger_callback(void *cls, const char *uri)
 {
-	if (logCB)
-		logCB->logMessage(cls, LOG_INFO, MODULE_WS, 0, uri);
+	if (logCB) {
+		std::stringstream ss;
+		ss << "URI: " << uri;
+		logCB->logMessage(cls, LOG_INFO, MODULE_WS, 0, ss.str());
+	}
 	return nullptr;
 }
 
@@ -336,7 +339,7 @@ static MHD_Result processFile(
     }
 	if (file == nullptr) {
 		if (logCB)
-			logCB->logMessage(connection, LOG_ERR, MODULE_WS, 404, "File not found " + std::string(localFileName));
+			logCB->logMessage(connection, LOG_ERR, MODULE_WS, 404, "File not found " + filename);
 
 		response = MHD_create_response_from_buffer(strlen(MSG404), (void *) MSG404, MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
@@ -735,7 +738,7 @@ static MHD_Result request_callback(
 	}
 	requestenv->request.requestType = parseRequestType(url);
 
-    bool authorized = true;
+    bool authorized;
 
     // Verify JWT token by "Authorization: Bearer ..." header
     std::string jwt;
@@ -751,13 +754,27 @@ static MHD_Result request_callback(
             }));
         }
     }
+	if (logCB) {
+		std::stringstream ss;
+		ss << "Authorization : Bearer " << jwt;
+		logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
+	}
+
 #ifdef ENABLE_JWT
+	authorized = false;
     AuthJWT *aj = (AuthJWT *) ((WSConfig*) cls)->jwt;
     if (aj) {
         if (!aj->issuer.empty()) {
             authorized = aj->verify(jwt);
         }
     }
+	if (logCB) {
+		std::stringstream ss;
+		ss << (authorized ? "" : "not ") << "authorized";
+		logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
+	}
+#else
+	authorized = true;
 #endif
     if (requestenv->request.requestType == RT_UNKNOWN) {
         // if JSON service not found, try load from the host handler callback, then from the file
@@ -772,10 +789,17 @@ static MHD_Result request_callback(
             int responseCode = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
                 MODULE_WS, url, method, version, q, upload_data, upload_data_size, authorized);
 
+			if (logCB) {
+				std::stringstream ss;
+				ss << "Unknown response " << responseCode << " on special path: " << url << ", content: "<< ct.substr(0, 30) << ".., size: " << ct.size();
+				logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
+			}
+
             switch (responseCode) {
                 case 200: {
                     if (ct.empty())
                         ct = CT_JSON;
+
                     specResponse = MHD_create_response_from_buffer(content.size(), (void *) content.c_str(),
                         MHD_RESPMEM_MUST_COPY);
                     addCORS(specResponse);
@@ -814,6 +838,12 @@ static MHD_Result request_callback(
             response = MHD_create_response_from_buffer(strlen(MSG_DELETE_OK), (void *) MSG_DELETE_OK, MHD_RESPMEM_PERSISTENT);
         }
     } else {
+		if (logCB) {
+			std::stringstream ss;
+			ss << "Select ";
+			logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
+		}
+
         // SELECT
         int r = (int) startFetchDb(connection, requestenv);
         if (r) {

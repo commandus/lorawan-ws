@@ -3,8 +3,10 @@
 #define sqlite3_errstr(r) sqlite3_errmsg(db);
 #endif
 
+static const std::string ERR_NO_DB_OPEN = "No database is opened";
+
 DatabaseSQLite::DatabaseSQLite()
-	: db(NULL)
+	: db(nullptr)
 {
 	errmsg = "";
 	type = "sqlite3";
@@ -27,7 +29,7 @@ int DatabaseSQLite::open(
 {
 	int r = sqlite3_open(connection.c_str(), &db);
 	if (r)
-		db = NULL;
+		db = nullptr;
 	return r;
 }
 
@@ -35,7 +37,7 @@ int DatabaseSQLite::close()
 {
 	int r = sqlite3_close(db);
 	if (!r)
-		db = NULL;
+		db = nullptr;
 	return r;
 }
 
@@ -51,8 +53,7 @@ static int sqlite3Callback(
 	std::vector<std::vector<std::string>> *retval = (std::vector<std::vector<std::string>> *) env;
 
 	std::vector<std::string> line;
-	for (int i = 0; i < columns; i++)
-	{
+	for (int i = 0; i < columns; i++) {
 		// printf("%s = %s\n", column[i], value[i] ? value[i] : "NULL");
 		line.push_back(value[i] ? value[i] : "");
 	}
@@ -64,8 +65,12 @@ int DatabaseSQLite::exec(
 	const std::string &statement
 )
 {
+	if (!db) {
+		errmsg = ERR_NO_DB_OPEN;
+		return SQLITE_ERROR;
+	}
 	char *zErrMsg = 0;
-	int r = sqlite3_exec(db, statement.c_str(), sqlite3Callback, NULL, &zErrMsg);
+	int r = sqlite3_exec(db, statement.c_str(), sqlite3Callback, nullptr, &zErrMsg);
   	if (r)
 		errmsg = std::string(zErrMsg);
 	return r;
@@ -77,6 +82,11 @@ int DatabaseSQLite::select
 	const std::string &statement
 )
 {
+	if (!db) {
+		errmsg = ERR_NO_DB_OPEN;
+		return SQLITE_ERROR;
+	}
+
 	char *zErrMsg = 0;
 	int r = sqlite3_exec(db, statement.c_str(), sqlite3Callback, &retval, &zErrMsg);
   	if (r)
@@ -92,6 +102,11 @@ int DatabaseSQLite::cursorOpen(
 	std::string &statement
 )
 {
+	if (!db) {
+		errmsg = ERR_NO_DB_OPEN;
+		return SQLITE_ERROR;
+	}
+
 	int r = sqlite3_prepare_v2(db, statement.c_str(), -1, (sqlite3_stmt **) retStmt, NULL);
 	if (r)
 		errmsg = sqlite3_errstr(r);
@@ -105,7 +120,7 @@ int DatabaseSQLite::cursorBindText(
 )
 {
 	// int r = sqlite3_bind_text((sqlite3_stmt *) stmt, position1, value.c_str(), -1, SQLITE_STATIC);
-	long int v = strtol(value.c_str(), NULL, 10);
+	long int v = strtol(value.c_str(), nullptr, 10);
 	int r = sqlite3_bind_int((sqlite3_stmt *) stmt, position1, v);
 	if (r)
         errmsg = sqlite3_errstr(r);

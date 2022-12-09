@@ -20,9 +20,13 @@ bool AuthJWT::verify(
     const std::string &token
 )
 {
-    const jwt::decoded_jwt<jwt::traits::kazuho_picojson> s = jwt::decode(token);
+    try {
+        const jwt::decoded_jwt<jwt::traits::kazuho_picojson> s = jwt::decode(token);
 
-    std::error_code ec;
-    verifier->verify(s, ec);
-    return ec.value() == 0;
+        std::error_code ec;
+        verifier->verify(s, ec);
+        return ec.value() == 0;
+    } catch (...) {
+        return false;
+    }
 }
