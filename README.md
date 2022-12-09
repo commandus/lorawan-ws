@@ -23,7 +23,9 @@ ws-sqlite - веб сервер HTTP/1.0
 Запустите веб сервис, указав в опции -r путь к каталогу, где размещены веб страницы.
 
 ```
-./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -r ../lorawan-ws-angular/lorawan-ws-angular/dist/lorawan-ws-angular -l 1.log
+./ws-sqlite -d ../logger-huffman/db/logger-huffman.db -r ../lorawan-ws-angular/lorawan-ws-angular/dist/lorawan-ws-angular -i local -s "1-2-3" -l 1.log
+
+./ws-sqlite -d ~/dist/logger-huffman.db -r ~/dist/html -p 5002 -i local -s "1-2-3"
 ```
 
 Опция -l указывает записывать в файл журнала адреса загруженных из веб сервиса данных.
