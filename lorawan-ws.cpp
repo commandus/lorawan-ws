@@ -435,6 +435,10 @@ static START_FETCH_DB_RESULT startFetchDb(
 	RequestEnv *env
 )
 {
+	if (logCB) {
+		logCB->logMessage(env, LOG_INFO, MODULE_WS, 0, "Fetch");
+	}
+
 	std::stringstream pathSelectSS;
 	pathSelectSS << pathSelectPrefix[env->request.requestType];
 	// get by identifier- no optional conditions
@@ -450,6 +454,13 @@ static START_FETCH_DB_RESULT startFetchDb(
     }
 
     std::string pathSelect = pathSelectSS.str();
+
+	if (logCB) {
+		std::stringstream ss;
+		ss << "SQL " << pathSelect;
+		logCB->logMessage(env, LOG_INFO, MODULE_WS, 0, ss.str());
+	}
+
 	// preparation
 	int r = env->db->cursorOpen(&env->stmt, pathSelect);
 	if (r) {
@@ -462,7 +473,11 @@ static START_FETCH_DB_RESULT startFetchDb(
 			logCB->logMessage(env, LOG_ERR, MODULE_WS, r, ss.str());
 		}
 		return START_FETCH_DB_PREPARE_FAILED;
-    }
+    } else {
+		if (logCB) {
+			logCB->logMessage(env, LOG_INFO, MODULE_WS, 0, "cursor opened");
+		}
+	}
 
     if (!((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1))) {
         // bind required params if no id
