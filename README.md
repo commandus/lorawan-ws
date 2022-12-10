@@ -187,6 +187,7 @@ kosa-ge=11&kosa-le=22
 Сборка с авторизацией по JWT токену
 
 GNU Autoconf/Automake:
+
 ```shell
 ./autogen.sh
 ./configure --enable-jwt
@@ -194,6 +195,7 @@ make
 ```
 
 CMake:
+
 ```shell
 mkdir build
 cd build
@@ -201,11 +203,26 @@ cmake -DENABLE_JWT=ON ..
 make
 ```
 
+CMake Windows (Visual Studio):
+
+```
+cd \git\vcpkg
+vcpkg install openssl:x64-windows
+vcpkg install sqlite3:x64-windows
+vcpkg install libmicrohttpd:x64-windows-static
+
+cd \git\lorawan-ws
+mkdir build
+cd build
+set unofficial-sqlite3_DIR=C:\git\vcpkg\packages\sqlite3_x64-windows
+set OPENSSL_ROOT_DIR=C:\git\vcpkg\packages\openssl_x64-windows
+cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/git/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DENABLE_JWT=on
+```
+
 Необходимые зависимости:
 
 - libmicrohttpd-0.9.43 (http://ftp.gnu.org/gnu/libmicrohttpd/)
 - sqlite3
-
 
 
 Если включен enable-jwt:
@@ -296,6 +313,10 @@ vcpkg по умолчанию устанавливает зависимости 
 
 Для целевой платформы x64, в отличие от x86, нужно вручную включить интеграцию проекта:
 
+Project properties -> Configuration properties -> vcpkg -> Use Vcpkg = Yes
+
+В старых версиях Visual Studio:
+
 В файле проекта ws-sqlite.vcxproj:
 ```
 <PropertyGroup Label="Globals">
@@ -307,6 +328,7 @@ vcpkg по умолчанию устанавливает зависимости 
 В папке D:\git\vcpkg\installed\x64-windows-static\lib\ 
 переименуйте libmicrohttpd.lib  в microhttpd.lib 
 
+Если Visual Studio не сможет найти библиотеку, включите путь до нее в проект вручную.
 
 Используйте CMake для создания решения Visual Studio:
 
@@ -314,7 +336,7 @@ vcpkg по умолчанию устанавливает зависимости 
 cd lorawan-ws
 mkdir build
 cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=D:/git/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/git/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
 ```
 
 Запустите созданное решение в Visual Studio, выберите конфигурацию Release и соберите проект ws-sqlite.

@@ -9,10 +9,16 @@ find_package(Threads REQUIRED)
 
 option(ENABLE_JWT "Enable JWT" OFF)
 
-# find_package(unofficial-sqlite3 CONFIG REQUIRED)
-# target_link_libraries(main PRIVATE unofficial::sqlite3::sqlite3)
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+	set(LIB_OS_SPECIFIC_SOURCE usleep.cpp)
+	find_package(unofficial-sqlite3 CONFIG REQUIRED)
+	set(DB_LIB unofficial::sqlite3::sqlite3)
+else ()
+	find_package(SQLite3 REQUIRED)
+	set(DB_LIB ${SQLite3_LIBRARIES})
+endif ()
 
-set(DB_LIB sqlite3)
+
 set(HTTPD_LIB microhttpd)
 
 include_directories("third_party" ${CURL_INCLUDE_DIR})
@@ -32,7 +38,10 @@ set(LIB_LORAWAN_WS_SRC
 if(ENABLE_JWT)
 	set(WS_SQLITE_SOURCES ${WS_SQLITE_SOURCES} auth-jwt.cpp)
 	set(LIB_LORAWAN_WS_SRC ${LIB_LORAWAN_WS_SRC} auth-jwt.cpp)
-	set(EXTRA_LIBS crypto ssl)
+# OpenSSL
+	set(OPENSSL_USE_STATIC_LIBS TRUE)
+	find_package(OpenSSL REQUIRED)
+	set(EXTRA_LIBS OpenSSL::Crypto OpenSSL::SSL)
 	set(EXTRA_DEF ENABLE_JWT)
 endif()
 

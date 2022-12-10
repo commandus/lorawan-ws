@@ -1,10 +1,15 @@
-/**
- *
- */
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <iostream>
 #include <string.h>
 #include <signal.h>
 #include <limits.h>
+
+#ifdef ENABLE_JWT
+#include "auth-jwt.h"
+#endif
 
 #include <microhttpd.h>
 #include <sqlite3.h>
@@ -18,10 +23,6 @@
 #include "db-helper.h"
 
 #include "daemonize/daemonize.h"
-
-#ifdef ENABLE_JWT
-#include "auth-jwt.h"
-#endif
 
 const char *progname = "ws-sqlite";
 

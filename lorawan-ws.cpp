@@ -10,6 +10,10 @@
 #include <vector>
 #include <map>
 
+#ifdef ENABLE_JWT
+#include "auth-jwt.h"
+#endif
+
 #include "platform.h"
 
 #include <sys/stat.h>
@@ -42,10 +46,6 @@
 #define MODULE_WS	200
 
 #include "lorawan-ws.h"
-
-#ifdef ENABLE_JWT
-#include "auth-jwt.h"
-#endif
 
 #include "log-intf.h"
 
