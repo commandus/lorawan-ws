@@ -55,7 +55,9 @@ add_library(ws-sqlite STATIC
 	${LIB_LORAWAN_WS_SRC}
 )
 target_compile_definitions(ws-sqlite PUBLIC ${EXTRA_DEF})
-
+target_link_libraries(ws-sqlite PRIVATE Threads::Threads
+	${EXTRA_LIBS}
+)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/ws-sqlite DESTINATION cmake)
 INSTALL(FILES README.md LICENSE HISTORY COPYING TODO CODE_OF_CONDUCT.md CONTRIBUTING.md DESTINATION doc)
 
