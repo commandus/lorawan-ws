@@ -17,8 +17,13 @@ typedef enum {
 class DatabaseIntf
 {
 public:
+	bool isOpen;
 	std::string type;
 	std::string errmsg;
+
+	DatabaseIntf() : isOpen(false) {};
+	virtual ~DatabaseIntf() {};
+
 	// Example: config->lasterr = sqlite3_open_v2(config->connectionString, (sqlite3 **) &config->db, SQLITE_OPEN_READWRITE, NULL);	// SQLITE_OPEN_READWRITE
 	virtual int open(
 		const std::string &connection,

@@ -239,11 +239,13 @@ const char *requestTypeString(RequestType value)
 
 void *uri_logger_callback(void *cls, const char *uri)
 {
+	/*
 	if (logCB) {
 		std::stringstream ss;
 		ss << "URI: " << uri;
 		logCB->logMessage(cls, LOG_INFO, MODULE_WS, 0, ss.str());
 	}
+	*/
 	return nullptr;
 }
 
@@ -435,10 +437,6 @@ static START_FETCH_DB_RESULT startFetchDb(
 	RequestEnv *env
 )
 {
-	if (logCB) {
-		logCB->logMessage(env, LOG_INFO, MODULE_WS, 0, "Fetch");
-	}
-
 	std::stringstream pathSelectSS;
 	pathSelectSS << pathSelectPrefix[env->request.requestType];
 	// get by identifier- no optional conditions
@@ -455,11 +453,13 @@ static START_FETCH_DB_RESULT startFetchDb(
 
     std::string pathSelect = pathSelectSS.str();
 
+	/*
 	if (logCB) {
 		std::stringstream ss;
 		ss << "SQL " << pathSelect;
 		logCB->logMessage(env, LOG_INFO, MODULE_WS, 0, ss.str());
 	}
+	*/
 
 	// preparation
 	int r = env->db->cursorOpen(&env->stmt, pathSelect);
@@ -473,10 +473,6 @@ static START_FETCH_DB_RESULT startFetchDb(
 			logCB->logMessage(env, LOG_ERR, MODULE_WS, r, ss.str());
 		}
 		return START_FETCH_DB_PREPARE_FAILED;
-    } else {
-		if (logCB) {
-			logCB->logMessage(env, LOG_INFO, MODULE_WS, 0, "cursor opened");
-		}
 	}
 
     if (!((env->request.requestType == RT_RAW_1) || (env->request.requestType == RT_T_1))) {
@@ -769,12 +765,13 @@ static MHD_Result request_callback(
             }));
         }
     }
+	/*
 	if (logCB) {
 		std::stringstream ss;
 		ss << "Authorization : Bearer " << jwt;
 		logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
 	}
-
+	*/
 #ifdef ENABLE_JWT
 	authorized = false;
     AuthJWT *aj = (AuthJWT *) ((WSConfig*) cls)->jwt;
@@ -783,11 +780,6 @@ static MHD_Result request_callback(
             authorized = aj->verify(jwt);
         }
     }
-	if (logCB) {
-		std::stringstream ss;
-		ss << (authorized ? "" : "not ") << "authorized";
-		logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
-	}
 #else
 	authorized = true;
 #endif
@@ -803,13 +795,6 @@ static MHD_Result request_callback(
             MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, putStringVector, &q);
             int responseCode = requestenv->config->onSpecialPathHandler->handle(content, ct, requestenv->config,
                 MODULE_WS, url, method, version, q, upload_data, upload_data_size, authorized);
-
-			if (logCB) {
-				std::stringstream ss;
-				ss << "Unknown response " << responseCode << " on special path: " << url << ", content: "<< ct.substr(0, 30) << ".., size: " << ct.size();
-				logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
-			}
-
             switch (responseCode) {
                 case 200: {
                     if (ct.empty())
@@ -853,12 +838,6 @@ static MHD_Result request_callback(
             response = MHD_create_response_from_buffer(strlen(MSG_DELETE_OK), (void *) MSG_DELETE_OK, MHD_RESPMEM_PERSISTENT);
         }
     } else {
-		if (logCB) {
-			std::stringstream ss;
-			ss << "Select ";
-			logCB->logMessage(requestenv->config, LOG_INFO, MODULE_WS, 0, ss.str());
-		}
-
         // SELECT
         int r = (int) startFetchDb(connection, requestenv);
         if (r) {

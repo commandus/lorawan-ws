@@ -6,7 +6,7 @@
 static const std::string ERR_NO_DB_OPEN = "No database is opened";
 
 DatabaseSQLite::DatabaseSQLite()
-	: db(nullptr)
+	: DatabaseIntf(), db(nullptr)
 {
 	errmsg = "";
 	type = "sqlite3";
@@ -30,6 +30,7 @@ int DatabaseSQLite::open(
 	int r = sqlite3_open(connection.c_str(), &db);
 	if (r)
 		db = nullptr;
+	isOpen = true;
 	return r;
 }
 
@@ -38,6 +39,7 @@ int DatabaseSQLite::close()
 	int r = sqlite3_close(db);
 	if (!r)
 		db = nullptr;
+	isOpen = false;
 	return r;
 }
 
